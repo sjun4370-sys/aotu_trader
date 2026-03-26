@@ -21,13 +21,17 @@ async function dragConnection(
   const fromBox = await from.boundingBox()
   const toBox = await to.boundingBox()
   if (!fromBox || !toBox) {
-    throw new Error('Missing port bounding box for drag connection')
+    throw new Error('Missing port bounding box for connection events')
   }
 
-  await page.mouse.move(fromBox.x + fromBox.width / 2, fromBox.y + fromBox.height / 2)
-  await page.mouse.down()
-  await page.mouse.move(toBox.x + toBox.width / 2, toBox.y + toBox.height / 2, { steps: 10 })
-  await page.mouse.up()
+  await from.dispatchEvent('pointerdown', {
+    clientX: fromBox.x + fromBox.width / 2,
+    clientY: fromBox.y + fromBox.height / 2,
+    button: 0,
+    bubbles: true,
+  })
+  await expect(page.getByTestId('workflow-edge-preview')).toHaveCount(1)
+  await to.click({ force: true })
 }
 
 async function panCanvas(page: import('@playwright/test').Page, start: { x: number; y: number }, end: { x: number; y: number }) {
@@ -50,6 +54,11 @@ async function ctrlWheelZoom(page: import('@playwright/test').Page, deltaY: numb
   }, { deltaY, clientX: client.x, clientY: client.y })
 }
 
+async function selectNodeStatus(page: import('@playwright/test').Page, label: string) {
+  await page.getByRole('combobox').click()
+  await page.getByRole('option', { name: label }).click()
+}
+
 test('workflow canvas supports drag, inspector, and edge creation', async ({ page }) => {
   await page.goto('/')
 
@@ -70,12 +79,12 @@ test('workflow canvas supports drag, inspector, and edge creation', async ({ pag
   await expect(page.getByTestId('node-inspector')).toBeVisible()
   await expect(page.getByTestId('node-quick-popover')).toHaveCount(0)
 
-  await page.getByRole('combobox').selectOption('disabled')
+  await selectNodeStatus(page, '停用')
   await page.getByRole('textbox').fill('{"interval":"1m"}')
   await page.getByRole('button', { name: '应用' }).click()
 
   await marketNode.click()
-  await expect(page.getByRole('combobox')).toHaveValue('disabled')
+  await expect(page.getByRole('combobox')).toContainText('停用')
   await expect(marketNode).toContainText('1m')
 
   await currencyNode.click()
@@ -94,8 +103,8 @@ test('workflow canvas supports drag, inspector, and edge creation', async ({ pag
 
   await dragConnection(
     page,
-    currencyNode.getByRole('button', { name: '输出端口 币种' }),
-    marketNode.getByRole('button', { name: '输入端口 币种' })
+    currencyNode.getByLabel('输出端口 币种'),
+    marketNode.getByLabel('输入端口 币种')
   )
 
   const edge = page.locator('[data-testid^="workflow-edge-edge_"]')

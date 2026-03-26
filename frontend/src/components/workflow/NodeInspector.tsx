@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import type { WorkflowNode, WorkflowNodeStatus } from '../../types/workflow'
 import styles from './NodeInspector.module.css'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface NodeInspectorProps {
   node: WorkflowNode | null
@@ -15,18 +22,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   strategy: '策略',
   ai: 'AI',
   tool: '工具'
-}
-
-const TYPE_LABELS: Record<string, string> = {
-  currency: '货币节点',
-  market: '市场数据',
-  account: '账户信息',
-  indicator: '技术指标',
-  strategy: '策略节点',
-  analysis: '分析节点',
-  trade: '交易节点',
-  condition: '条件节点',
-  loop: '循环节点'
 }
 
 const STATUS_OPTIONS: { value: WorkflowNodeStatus; label: string }[] = [
@@ -77,23 +72,27 @@ function NodeInspectorContent({
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>基本信息</h3>
           <dl className={styles.infoGrid}>
-            <dt className={styles.infoLabel}>类型</dt>
-            <dd className={styles.infoValue}>{TYPE_LABELS[node.type] ?? node.type}</dd>
-            <dt className={styles.infoLabel}>分类</dt>
-            <dd className={styles.infoValue}>{CATEGORY_LABELS[node.category] ?? node.category}</dd>
             <dt className={styles.infoLabel}>状态</dt>
             <dd className={styles.infoValue}>
-              <select
-                className={styles.statusSelect}
+              <Select
                 value={status}
-                onChange={(e) => setStatus(e.target.value as WorkflowNodeStatus)}
+                onValueChange={(value) => setStatus(value as WorkflowNodeStatus)}
               >
-                {STATUS_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className={styles.statusSelectTrigger}>
+                  <SelectValue placeholder="选择状态" />
+                </SelectTrigger>
+                <SelectContent className={styles.statusSelectContent}>
+                  {STATUS_OPTIONS.map((opt) => (
+                    <SelectItem
+                      key={opt.value}
+                      value={opt.value}
+                      className={opt.value === 'enabled' ? styles.statusItemEnabled : styles.statusItemDisabled}
+                    >
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </dd>
           </dl>
         </section>

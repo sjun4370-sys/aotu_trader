@@ -16,6 +16,7 @@ interface CanvasNodeProps {
   onPointerDown?: (e: ReactPointerEvent, node: WorkflowNode) => void
   onPortClick?: (node: WorkflowNode, port: WorkflowPort) => void
   onPortPointerDown?: (event: ReactPointerEvent<HTMLButtonElement>, node: WorkflowNode, port: WorkflowPort) => void
+  onPortPointerUp?: (event: ReactPointerEvent<HTMLButtonElement>, node: WorkflowNode, port: WorkflowPort) => void
   onPortPointerEnter?: (node: WorkflowNode, port: WorkflowPort) => void
   onPortPointerLeave?: (node: WorkflowNode, port: WorkflowPort) => void
   activePortId?: string | null
@@ -39,6 +40,7 @@ export default function CanvasNode({
   onPointerDown,
   onPortClick,
   onPortPointerDown,
+  onPortPointerUp,
   onPortPointerEnter,
   onPortPointerLeave,
   activePortId
@@ -75,6 +77,11 @@ export default function CanvasNode({
     onPortPointerDown?.(event, node, port)
   }
 
+  const handlePortPointerUp = (event: ReactPointerEvent<HTMLButtonElement>, port: WorkflowPort) => {
+    event.stopPropagation()
+    onPortPointerUp?.(event, node, port)
+  }
+
   const innerClass = [styles.inner, isSelected ? styles.innerSelected : null]
     .filter(Boolean)
     .join(' ')
@@ -103,6 +110,7 @@ export default function CanvasNode({
           outputs={node.outputs}
           onPortClick={handlePortClick}
           onPortPointerDown={handlePortPointerDown}
+          onPortPointerUp={handlePortPointerUp}
           onPortPointerEnter={(port) => onPortPointerEnter?.(node, port)}
           onPortPointerLeave={(port) => onPortPointerLeave?.(node, port)}
           activePortId={activePortId}

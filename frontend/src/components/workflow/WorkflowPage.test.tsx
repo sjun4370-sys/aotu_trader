@@ -106,15 +106,16 @@ describe('WorkflowPage', () => {
     expect(screen.queryByTestId('node-quick-popover')).not.toBeInTheDocument()
     expect(screen.getByTestId('node-inspector-panel')).toBeInTheDocument()
 
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'disabled' } })
+    fireEvent.click(screen.getByRole('combobox'))
+    fireEvent.click(screen.getByRole('option', { name: '停用' }))
     fireEvent.change(screen.getByRole('textbox'), {
       target: { value: '{"interval":"1m"}' }
     })
     fireEvent.click(screen.getByRole('button', { name: '应用' }))
 
     fireEvent.click(node)
-    expect(screen.getByDisplayValue('停用')).toBeInTheDocument()
-    expect(screen.getByText('1m')).toBeVisible()
+    expect(screen.getByRole('combobox')).toHaveTextContent('停用')
+    expect(node).toHaveTextContent('1m')
     expect(node).toHaveAttribute('data-node-status', 'disabled')
   })
 
@@ -143,8 +144,8 @@ describe('WorkflowPage', () => {
     const currencyNode = screen.getByLabelText('工作流节点 币种选择器')
     const marketNode = screen.getByLabelText('工作流节点 获取市场数据')
 
-    const outputPort = within(currencyNode).getByRole('button', { name: '输出端口 币种' })
-    const inputPort = within(marketNode).getByRole('button', { name: '输入端口 币种' })
+    const outputPort = within(currencyNode).getByLabelText('输出端口 币种')
+    const inputPort = within(marketNode).getByLabelText('输入端口 币种')
 
     fireEvent.pointerDown(outputPort, { clientX: 380, clientY: 220 })
     expect(screen.getByTestId('workflow-edge-preview')).toBeInTheDocument()
@@ -153,7 +154,7 @@ describe('WorkflowPage', () => {
     fireEvent.pointerUp(window)
     expect(screen.queryByTestId('workflow-edge-preview')).not.toBeInTheDocument()
 
-    const edgePaths = container.querySelectorAll('[data-testid^="workflow-edge-edge_"]')
+    const edgePaths = container.querySelectorAll('[data-testid^="workflow-edge-"]')
     expect(edgePaths).toHaveLength(1)
 
     fireEvent.click(marketNode)
@@ -171,8 +172,8 @@ describe('WorkflowPage', () => {
     const currencyNode = screen.getByLabelText('工作流节点 币种选择器')
     const marketNode = screen.getByLabelText('工作流节点 获取市场数据')
 
-    fireEvent.pointerDown(within(currencyNode).getByRole('button', { name: '输出端口 币种' }), { clientX: 380, clientY: 220 })
-    fireEvent.pointerEnter(within(marketNode).getByRole('button', { name: '输入端口 币种' }))
+    fireEvent.pointerDown(within(currencyNode).getByLabelText('输出端口 币种'), { clientX: 380, clientY: 220 })
+    fireEvent.pointerEnter(within(marketNode).getByLabelText('输入端口 币种'))
     fireEvent.pointerUp(window)
 
     fireEvent.contextMenu(currencyNode, { clientX: 320, clientY: 220 })
@@ -180,7 +181,7 @@ describe('WorkflowPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '停用节点' }))
 
     expect(currencyNode).toHaveAttribute('data-node-status', 'disabled')
-    expect(container.querySelector('[data-testid^="workflow-edge-edge_"]')).toHaveAttribute('data-edge-disabled', 'true')
+    expect(container.querySelector('[data-testid^="workflow-edge-"]')).toHaveAttribute('data-edge-disabled', 'true')
 
     fireEvent.contextMenu(currencyNode, { clientX: 320, clientY: 220 })
     fireEvent.click(within(screen.getByTestId('node-context-menu')).getByRole('button', { name: '删除节点' }))
@@ -248,11 +249,11 @@ describe('WorkflowPage', () => {
     render(<WorkflowPage />)
 
     dropPaletteNode('market')
-    const content = screen.getByTestId('workflow-content')
+    const canvas = screen.getByTestId('workflow-canvas')
     fireEvent.click(screen.getByLabelText('工作流节点 获取市场数据'))
     expect(screen.getByTestId('node-inspector-panel')).toHaveAttribute('data-visible', 'true')
 
-    fireEvent.click(content)
+    fireEvent.click(canvas)
 
     expect(screen.getByTestId('node-inspector-panel')).toHaveAttribute('data-visible', 'false')
   })

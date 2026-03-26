@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 import PaletteFloatingPanel from './PaletteFloatingPanel'
 import type { PaletteDragPayload } from './PaletteFloatingPanel'
-import CanvasViewport from './CanvasViewport'
+import WorkflowReactFlowViewport from './WorkflowReactFlowViewport'
 import ZoomControls from './ZoomControls'
 import NodeContextMenu from './NodeContextMenu'
 import NodeInspector from './NodeInspector'
@@ -24,15 +24,15 @@ import styles from './WorkflowPage.module.css'
 const NODE_HEIGHT = 120
 const CANVAS_GRID_SIZE = 12
 
-interface ConnectionTarget {
-  nodeId: string
-  portId: string
-}
-
 interface ContextMenuState {
   nodeId: string
   left: number
   top: number
+}
+
+interface ConnectionTarget {
+  nodeId: string
+  portId: string
 }
 
 export default function WorkflowPage() {
@@ -57,6 +57,13 @@ export default function WorkflowPage() {
   const [connectionDraft, setConnectionDraft] = useState<WorkflowConnectionDraft | null>(null)
   const [connectionTarget, setConnectionTarget] = useState<ConnectionTarget | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const connectionDraftRef = useRef<WorkflowConnectionDraft | null>(null)
+  const connectionTargetRef = useRef<ConnectionTarget | null>(null)
+  const pointerClientRef = useRef<{ x: number; y: number } | null>(null)
+
+  useEffect(() => {
+    connectionDraftRef.current = connectionDraft
+  }, [connectionDraft])
 
   const selectedNodes = useMemo(
     () => nodes.filter((node) => selectedNodeIds.includes(node.id)),
@@ -135,20 +142,84 @@ export default function WorkflowPage() {
     }
 
     const handlePointerMove = (event: PointerEvent) => {
+      pointerClientRef.current = { x: event.clientX, y: event.clientY }
       const point = buildDraftPointFromClient(event.clientX, event.clientY)
-      if (point) {
-        setConnectionDraft((draft) => draft ? { ...draft, point } : draft)
+      if (!point) {
+        return
       }
+
+      const hitElements = document.elementsFromPoint(event.clientX, event.clientY)
+      let hoveredTarget: ConnectionTarget | null = null
+
+      for (const element of hitElements) {
+        if (!(element instanceof HTMLElement)) {
+          continue
+        }
+
+        const portElement = element.closest<HTMLElement>('[data-port-direction="input"][data-port-id]')
+        const nodeElement = element.closest<HTMLElement>('[data-testid^="canvas-node-"]')
+        const nodeTestId = nodeElement?.dataset.testid ?? nodeElement?.getAttribute('data-testid')
+
+        if (portElement && nodeTestId?.startsWith('canvas-node-')) {
+          hoveredTarget = {
+            nodeId: nodeTestId.replace('canvas-node-', ''),
+            portId: portElement.dataset.portId ?? '',
+          }
+          break
+        }
+      }
+
+      if (hoveredTarget) {
+        connectionTargetRef.current = hoveredTarget
+        setConnectionTarget(hoveredTarget)
+        const targetNode = nodes.find((node) => node.id === hoveredTarget.nodeId)
+        const targetPoint = targetNode ? getPortPoint(targetNode, hoveredTarget.portId, 'input') : null
+        if (targetPoint) {
+          setConnectionDraft((draft) => draft ? { ...draft, point: targetPoint } : draft)
+          return
+        }
+      } else {
+        connectionTargetRef.current = null
+        setConnectionTarget(null)
+      }
+
+      setConnectionDraft((draft) => draft ? { ...draft, point } : draft)
     }
 
     const handlePointerUp = () => {
       setConnectionDraft((draft) => {
-        if (draft && connectionTarget) {
-          commitConnection(draft, connectionTarget)
+        let target = connectionTargetRef.current ?? connectionTarget
+
+        if (!target && pointerClientRef.current) {
+          const hitElements = document.elementsFromPoint(pointerClientRef.current.x, pointerClientRef.current.y)
+          for (const element of hitElements) {
+            if (!(element instanceof HTMLElement)) {
+              continue
+            }
+
+            const portElement = element.closest<HTMLElement>('[data-port-direction="input"][data-port-id]')
+            const nodeElement = element.closest<HTMLElement>('[data-testid^="canvas-node-"]')
+            const nodeTestId = nodeElement?.dataset.testid ?? nodeElement?.getAttribute('data-testid')
+
+            if (portElement && nodeTestId?.startsWith('canvas-node-')) {
+              target = {
+                nodeId: nodeTestId.replace('canvas-node-', ''),
+                portId: portElement.dataset.portId ?? '',
+              }
+              break
+            }
+          }
         }
+
+        if (draft && target) {
+          commitConnection(draft, target)
+        }
+        connectionDraftRef.current = null
         return null
       })
       setConnectionTarget(null)
+      connectionTargetRef.current = null
+      pointerClientRef.current = null
     }
 
     window.addEventListener('pointermove', handlePointerMove)
@@ -158,7 +229,7 @@ export default function WorkflowPage() {
       window.removeEventListener('pointermove', handlePointerMove)
       window.removeEventListener('pointerup', handlePointerUp)
     }
-  }, [buildDraftPointFromClient, commitConnection, connectionDraft, connectionTarget])
+  }, [buildDraftPointFromClient, commitConnection, connectionDraft, connectionTarget, getPortPoint, nodes])
 
   const createNode = useCallback((payload: PaletteDragPayload) => {
     const viewport = viewportRef.current
@@ -224,7 +295,9 @@ export default function WorkflowPage() {
   const handleBackgroundClick = useCallback(() => {
     setSelectedNodeIds([])
     setConnectionDraft(null)
+    connectionDraftRef.current = null
     setConnectionTarget(null)
+    connectionTargetRef.current = null
     setContextMenu(null)
   }, [setSelectedNodeIds])
 
@@ -270,10 +343,14 @@ export default function WorkflowPage() {
   }, [setNodes])
 
   const handlePortClick = useCallback((node: WorkflowNode, portId: string, direction: WorkflowPortDirection) => {
-    if (connectionDraft && direction === 'input') {
-      commitConnection(connectionDraft, { nodeId: node.id, portId })
+    const activeDraft = connectionDraftRef.current ?? connectionDraft
+
+    if (activeDraft && direction === 'input') {
+      commitConnection(activeDraft, { nodeId: node.id, portId })
       setConnectionDraft(null)
+      connectionDraftRef.current = null
       setConnectionTarget(null)
+      connectionTargetRef.current = null
       return
     }
 
@@ -283,16 +360,18 @@ export default function WorkflowPage() {
         return
       }
 
-      setConnectionDraft({
+      const nextDraft = {
         fromNodeId: node.id,
         fromPortId: portId,
         point: startPoint
-      })
+      }
+      setConnectionDraft(nextDraft)
+      connectionDraftRef.current = nextDraft
       replaceSelection([node.id])
       return
     }
 
-    if (connectionDraft) {
+    if (activeDraft) {
       setConnectionTarget({ nodeId: node.id, portId })
     }
   }, [commitConnection, connectionDraft, getPortPoint, replaceSelection])
@@ -308,33 +387,60 @@ export default function WorkflowPage() {
       return
     }
 
-    setConnectionDraft({
+    const nextDraft = {
       fromNodeId: node.id,
       fromPortId: port.id,
       point: pointerPoint
-    })
+    }
+    setConnectionDraft(nextDraft)
+    connectionDraftRef.current = nextDraft
     setConnectionTarget(null)
     replaceSelection([node.id])
   }, [buildDraftPointFromClient, replaceSelection])
 
-  const handlePortPointerEnter = useCallback((node: WorkflowNode, port: WorkflowPort) => {
-    if (!connectionDraft || port.direction !== 'input' || connectionDraft.fromNodeId === node.id) {
+  const handlePortPointerUp = useCallback((event: ReactPointerEvent<HTMLButtonElement>, node: WorkflowNode, port: WorkflowPort) => {
+    const activeDraft = connectionDraftRef.current ?? connectionDraft
+    if (!activeDraft || port.direction !== 'input' || activeDraft.fromNodeId === node.id) {
       return
     }
 
-    setConnectionTarget({ nodeId: node.id, portId: port.id })
+    event.preventDefault()
+    commitConnection(activeDraft, { nodeId: node.id, portId: port.id })
+    setConnectionDraft(null)
+    connectionDraftRef.current = null
+    setConnectionTarget(null)
+    connectionTargetRef.current = null
+  }, [commitConnection, connectionDraft])
+
+  const handlePortPointerEnter = useCallback((node: WorkflowNode, port: WorkflowPort) => {
+    const activeDraft = connectionDraftRef.current ?? connectionDraft
+    if (!activeDraft || port.direction !== 'input' || activeDraft.fromNodeId === node.id) {
+      return
+    }
+
+    const nextTarget = { nodeId: node.id, portId: port.id }
+    setConnectionTarget(nextTarget)
+    connectionTargetRef.current = nextTarget
     const targetPoint = getPortPoint(node, port.id, 'input')
     if (targetPoint) {
-      setConnectionDraft((draft) => draft ? { ...draft, point: targetPoint } : draft)
+      commitConnection({ ...activeDraft, point: targetPoint }, nextTarget)
+      setConnectionDraft(null)
+      connectionDraftRef.current = null
+      setConnectionTarget(null)
+      connectionTargetRef.current = null
     }
-  }, [connectionDraft, getPortPoint])
+  }, [commitConnection, connectionDraft, getPortPoint])
 
   const handlePortPointerLeave = useCallback((node: WorkflowNode, port: WorkflowPort) => {
     setConnectionTarget((currentTarget) => {
       if (!currentTarget) {
         return currentTarget
       }
-      return currentTarget.nodeId === node.id && currentTarget.portId === port.id ? null : currentTarget
+      if (currentTarget.nodeId === node.id && currentTarget.portId === port.id) {
+        connectionTargetRef.current = null
+        return null
+      }
+      return currentTarget
     })
   }, [])
 
@@ -342,10 +448,6 @@ export default function WorkflowPage() {
     const nextZoom = deltaY < 0 ? zoom + WORKFLOW_CANVAS_ZOOM_STEP : zoom - WORKFLOW_CANVAS_ZOOM_STEP
     zoomAtPoint(nextZoom, point)
   }, [zoom, zoomAtPoint])
-
-  const handleCanvasPointerMove = useCallback((point: WorkflowViewportPoint) => {
-    setConnectionDraft((draft) => draft ? { ...draft, point } : draft)
-  }, [])
 
   const handleResetView = useCallback(() => {
     resetView()
@@ -377,7 +479,7 @@ export default function WorkflowPage() {
     <div ref={pageRef} data-testid="workflow-page" className={styles.page}>
       <PaletteFloatingPanel onDragEnd={createNode} />
       <div className={styles.canvasWrapper}>
-        <CanvasViewport
+        <WorkflowReactFlowViewport
           zoom={zoom}
           canvasOffset={canvasOffset}
           nodes={nodes}
@@ -392,10 +494,10 @@ export default function WorkflowPage() {
           onNodesMove={handleNodesMove}
           onPortClick={handlePortClick}
           onPortPointerDown={handlePortPointerDown}
+          onPortPointerUp={handlePortPointerUp}
           onPortPointerEnter={handlePortPointerEnter}
           onPortPointerLeave={handlePortPointerLeave}
           activePortId={connectionTarget?.portId ?? null}
-          onCanvasPointerMove={handleCanvasPointerMove}
           onCanvasPan={setCanvasOffset}
           onCanvasWheelZoom={handleCanvasWheelZoom}
         />

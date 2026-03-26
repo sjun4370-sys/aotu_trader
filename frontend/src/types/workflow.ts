@@ -24,6 +24,11 @@ export interface WorkflowConnectionDraft {
   point: WorkflowNodePoint
 }
 
+export interface WorkflowConnectionTarget {
+  nodeId: string
+  portId: string
+}
+
 export interface WorkflowPort {
   id: string
   label: string

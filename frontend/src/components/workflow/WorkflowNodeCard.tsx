@@ -14,6 +14,7 @@ interface WorkflowNodeCardProps {
   className?: string
   onPortClick?: (event: MouseEvent<HTMLButtonElement>, port: WorkflowPort) => void
   onPortPointerDown?: (event: ReactPointerEvent<HTMLButtonElement>, port: WorkflowPort) => void
+  onPortPointerUp?: (event: ReactPointerEvent<HTMLButtonElement>, port: WorkflowPort) => void
   onPortPointerEnter?: (port: WorkflowPort) => void
   onPortPointerLeave?: (port: WorkflowPort) => void
   activePortId?: string | null
@@ -29,6 +30,7 @@ function PortRail({
   side,
   onPortClick,
   onPortPointerDown,
+  onPortPointerUp,
   onPortPointerEnter,
   onPortPointerLeave,
   activePortId
@@ -37,6 +39,7 @@ function PortRail({
   side: 'left' | 'right'
   onPortClick?: (event: MouseEvent<HTMLButtonElement>, port: WorkflowPort) => void
   onPortPointerDown?: (event: ReactPointerEvent<HTMLButtonElement>, port: WorkflowPort) => void
+  onPortPointerUp?: (event: ReactPointerEvent<HTMLButtonElement>, port: WorkflowPort) => void
   onPortPointerEnter?: (port: WorkflowPort) => void
   onPortPointerLeave?: (port: WorkflowPort) => void
   activePortId?: string | null
@@ -63,6 +66,7 @@ function PortRail({
             aria-label={`${port.direction === 'input' ? '输入' : '输出'}端口 ${port.label}`}
             title={port.label}
             onPointerDown={(event) => onPortPointerDown?.(event, port)}
+            onPointerUp={(event) => onPortPointerUp?.(event, port)}
             onPointerEnter={() => onPortPointerEnter?.(port)}
             onPointerLeave={() => onPortPointerLeave?.(port)}
             onClick={(event) => onPortClick?.(event, port)}
@@ -84,6 +88,7 @@ export default function WorkflowNodeCard({
   className,
   onPortClick,
   onPortPointerDown,
+  onPortPointerUp,
   onPortPointerEnter,
   onPortPointerLeave,
   activePortId = null
@@ -99,6 +104,7 @@ export default function WorkflowNodeCard({
           side="left"
           onPortClick={onPortClick}
           onPortPointerDown={onPortPointerDown}
+          onPortPointerUp={onPortPointerUp}
           onPortPointerEnter={onPortPointerEnter}
           onPortPointerLeave={onPortPointerLeave}
           activePortId={activePortId}
@@ -111,6 +117,7 @@ export default function WorkflowNodeCard({
           side="right"
           onPortClick={onPortClick}
           onPortPointerDown={onPortPointerDown}
+          onPortPointerUp={onPortPointerUp}
           onPortPointerEnter={onPortPointerEnter}
           onPortPointerLeave={onPortPointerLeave}
           activePortId={activePortId}
