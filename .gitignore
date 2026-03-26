@@ -42,4 +42,6 @@ htmlcov/
 # Logs
 *.log
 
-docs/
+docs/*
+!docs/skills-source/
+!docs/skills-source/**
