@@ -1,0 +1,43 @@
+.svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.path {
+  transition:
+    stroke-width 150ms ease,
+    opacity 150ms ease,
+    filter 150ms ease;
+  cursor: pointer;
+  stroke-linecap: round;
+}
+
+.pathActive {
+  stroke-dasharray: 12 6;
+  animation: edgeFlow 1.5s linear infinite;
+}
+
+.pathHovered {
+  stroke-dasharray: 10 5;
+  animation: edgeFlow 1s linear infinite;
+}
+
+@keyframes edgeFlow {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -36;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pathActive {
+    animation: none;
+  }
+}

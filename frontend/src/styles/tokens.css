@@ -1,0 +1,18 @@
+:root {
+  --wf-bg: #f5f6fb;
+  --wf-surface: rgba(255, 255, 255, 0.9);
+  --wf-surface-strong: rgba(241, 245, 249, 0.95);
+  --wf-text: #0f172a;
+  --wf-muted: #65748a;
+  --wf-node-currency: #0ea5a9;
+  --wf-node-data: #38bdf8;
+  --wf-node-strategy: #a855f7;
+  --wf-node-ai: #fb7185;
+  --wf-node-tool: #f59e0b;
+  --wf-radius-card: 28px;
+  --wf-radius-panel: 18px;
+  --wf-blur-md: 20px;
+  --wf-blur-lg: 42px;
+  --wf-duration-fast: 180ms;
+  --wf-duration-medium: 360ms;
+}

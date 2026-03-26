@@ -1,0 +1,41 @@
+.motion-reduce,
+.motion-reduce * {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+.motion-fade {
+  opacity: 0;
+  animation: motion-fade-in var(--wf-duration-fast) ease-out forwards;
+}
+
+.motion-slide-up {
+  transform: translateY(12px);
+  animation: motion-slide-up var(--wf-duration-medium) ease;
+  animation-fill-mode: forwards;
+}
+
+@keyframes motion-fade-in {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes motion-slide-up {
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-fade,
+  .motion-slide-up {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .motion-fade {
+    opacity: 1 !important;
+  }
+}

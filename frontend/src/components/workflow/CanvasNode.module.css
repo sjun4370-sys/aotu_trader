@@ -1,0 +1,55 @@
+/* Outer: 仅负责画布坐标定位，不参与动画 */
+.wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform;
+  outline: none;
+}
+
+.wrapper[data-node-status='disabled'] {
+  opacity: 0.72;
+}
+
+.wrapper:focus-visible .inner {
+  filter: drop-shadow(0 0 0 3px rgba(56, 189, 248, 0.35)) drop-shadow(0 0 14px rgba(56, 189, 248, 0.22));
+}
+
+/* Inner: 负责入场动画和选中效果，不参与坐标定位 */
+.inner {
+  animation: nodeAppear 280ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transition:
+    filter 200ms ease,
+    transform 200ms ease;
+}
+
+.wrapper:hover .inner {
+  transform: translateY(-4px) scale(1.015);
+  filter: drop-shadow(0 16px 28px rgba(15, 23, 42, 0.2)) drop-shadow(0 0 18px rgba(56, 189, 248, 0.18));
+}
+
+.wrapper[data-node-status='disabled']:hover .inner {
+  filter: drop-shadow(0 12px 22px rgba(100, 116, 139, 0.18)) drop-shadow(0 0 14px rgba(148, 163, 184, 0.28));
+}
+
+.innerSelected {
+  transform: translateY(-3px) scale(1.01);
+  filter: drop-shadow(0 14px 24px rgba(79, 70, 229, 0.22)) drop-shadow(0 0 14px rgba(99, 102, 241, 0.55));
+}
+
+@keyframes nodeAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.82) translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inner {
+    animation: none;
+  }
+}

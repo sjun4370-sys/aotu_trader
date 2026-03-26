@@ -1,0 +1,40 @@
+.glass-panel,
+.glass-card,
+.glass-pill {
+  background: var(--wf-surface);
+  background: color-mix(in srgb, var(--wf-surface) 72%, transparent);
+  border: 1px solid var(--wf-surface-strong);
+  border: 1px solid color-mix(in srgb, var(--wf-surface-strong) 18%, transparent);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+.glass-panel {
+  border-radius: var(--wf-radius-panel);
+  padding: 16px;
+}
+
+.glass-card {
+  border-radius: var(--wf-radius-card);
+  padding: 18px;
+}
+
+.glass-pill {
+  border-radius: 999px;
+  padding: 8px 12px;
+}
+
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .glass-panel,
+  .glass-card,
+  .glass-pill {
+    -webkit-backdrop-filter: blur(var(--wf-blur-md));
+    backdrop-filter: blur(var(--wf-blur-md));
+  }
+
+  .glass-panel[data-glass='strong'],
+  .glass-card[data-glass='strong'] {
+    -webkit-backdrop-filter: blur(var(--wf-blur-lg));
+    backdrop-filter: blur(var(--wf-blur-lg));
+    background: color-mix(in srgb, var(--wf-surface-strong) 64%, transparent);
+  }
+}

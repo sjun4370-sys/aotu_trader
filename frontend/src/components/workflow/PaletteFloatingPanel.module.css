@@ -1,0 +1,138 @@
+.panel {
+  grid-column: 1 / 2;
+  grid-row: 1 / 2;
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  width: 280px;
+  border-radius: var(--wf-radius-panel);
+  padding: 16px 12px;
+  background: color-mix(in srgb, var(--wf-surface-strong) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wf-surface-strong) 45%, transparent);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: visible;
+  transition: opacity var(--wf-duration-fast) ease;
+}
+
+.panel[data-dragging='true'] {
+  opacity: 0.55;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.title {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--wf-muted);
+  font-size: 0.8rem;
+}
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(72vh, 680px);
+  overflow: auto;
+  padding: 2px 10px;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.groups:hover {
+  scrollbar-color: rgba(15, 23, 42, 0.12) transparent;
+}
+
+.groups::-webkit-scrollbar {
+  width: 3px;
+}
+
+.groups::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.groups::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+  transition: background 200ms ease;
+}
+
+.groups:hover::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.12);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.groupLabel {
+  margin: 0;
+  font-size: 0.79rem;
+  color: var(--wf-muted);
+  letter-spacing: 0.02em;
+}
+
+.groupList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preview {
+  position: fixed;
+  pointer-events: none;
+  z-index: 30;
+  min-width: 160px;
+  max-width: 230px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--wf-node-data) 50%, transparent);
+  background: color-mix(in srgb, var(--wf-surface) 90%, transparent);
+  box-shadow:
+    0 24px 48px rgba(15, 23, 42, 0.28),
+    0 0 0 1px color-mix(in srgb, var(--wf-node-data) 20%, transparent);
+  transform: rotate(-1.5deg) scale(1.05);
+  backdrop-filter: blur(var(--wf-blur-md));
+  animation: previewAppear 140ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes previewAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.88) rotate(-1.5deg);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(-1.5deg) scale(1.05);
+  }
+}
+
+.previewTitle {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.previewMeta {
+  margin: 4px 0 0;
+  font-size: 0.72rem;
+  color: var(--wf-muted);
+}

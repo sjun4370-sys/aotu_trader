@@ -45,3 +45,4 @@ htmlcov/
 docs/*
 !docs/skills-source/
 !docs/skills-source/**
+.playwright-mcp

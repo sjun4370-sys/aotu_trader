@@ -1,0 +1,127 @@
+import type { ReactNode } from 'react'
+import type { CSSProperties, MouseEvent, PointerEvent as ReactPointerEvent } from 'react'
+import type { WorkflowNodeCategory, WorkflowNodeStatus, WorkflowPort } from '../../types/workflow'
+import styles from './WorkflowNodeCard.module.css'
+
+interface WorkflowNodeCardProps {
+  title: string
+  subtitle?: string
+  category?: WorkflowNodeCategory
+  status?: WorkflowNodeStatus
+  inputs?: WorkflowPort[]
+  outputs?: WorkflowPort[]
+  children?: ReactNode
+  className?: string
+  onPortClick?: (event: MouseEvent<HTMLButtonElement>, port: WorkflowPort) => void
+  onPortPointerDown?: (event: ReactPointerEvent<HTMLButtonElement>, port: WorkflowPort) => void
+  onPortPointerEnter?: (port: WorkflowPort) => void
+  onPortPointerLeave?: (port: WorkflowPort) => void
+  activePortId?: string | null
+}
+
+function getPortOffset(index: number, total: number) {
+  const segments = total + 1
+  return `${((index + 1) / segments) * 100}%`
+}
+
+function PortRail({
+  ports,
+  side,
+  onPortClick,
+  onPortPointerDown,
+  onPortPointerEnter,
+  onPortPointerLeave,
+  activePortId
+}: {
+  ports: WorkflowPort[]
+  side: 'left' | 'right'
+  onPortClick?: (event: MouseEvent<HTMLButtonElement>, port: WorkflowPort) => void
+  onPortPointerDown?: (event: ReactPointerEvent<HTMLButtonElement>, port: WorkflowPort) => void
+  onPortPointerEnter?: (port: WorkflowPort) => void
+  onPortPointerLeave?: (port: WorkflowPort) => void
+  activePortId?: string | null
+}) {
+  const railClassName = side === 'left' ? styles.portsLeft : styles.portsRight
+
+  return (
+    <div className={railClassName}>
+      {ports.map((port, index) => {
+        const style = {
+          top: getPortOffset(index, ports.length)
+        } satisfies CSSProperties
+
+        return (
+          <button
+            key={port.id}
+            type="button"
+            className={styles.port}
+            style={style}
+            data-port-id={port.id}
+            data-port-direction={port.direction}
+            data-port-side={side}
+            data-port-active={activePortId === port.id ? 'true' : 'false'}
+            aria-label={`${port.direction === 'input' ? '输入' : '输出'}端口 ${port.label}`}
+            title={port.label}
+            onPointerDown={(event) => onPortPointerDown?.(event, port)}
+            onPointerEnter={() => onPortPointerEnter?.(port)}
+            onPointerLeave={() => onPortPointerLeave?.(port)}
+            onClick={(event) => onPortClick?.(event, port)}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+export default function WorkflowNodeCard({
+  title,
+  subtitle,
+  category,
+  status = 'enabled',
+  inputs = [],
+  outputs = [],
+  children,
+  className,
+  onPortClick,
+  onPortPointerDown,
+  onPortPointerEnter,
+  onPortPointerLeave,
+  activePortId = null
+}: WorkflowNodeCardProps) {
+  const cardClass = [styles.card, className].filter(Boolean).join(' ')
+
+  return (
+    <article className={cardClass} data-testid="workflow-node-card" data-category={category} data-status={status}>
+      {/* Input port dots — left edge */}
+      {inputs.length > 0 && (
+        <PortRail
+          ports={inputs}
+          side="left"
+          onPortClick={onPortClick}
+          onPortPointerDown={onPortPointerDown}
+          onPortPointerEnter={onPortPointerEnter}
+          onPortPointerLeave={onPortPointerLeave}
+          activePortId={activePortId}
+        />
+      )}
+      {/* Output port dots — right edge */}
+      {outputs.length > 0 && (
+        <PortRail
+          ports={outputs}
+          side="right"
+          onPortClick={onPortClick}
+          onPortPointerDown={onPortPointerDown}
+          onPortPointerEnter={onPortPointerEnter}
+          onPortPointerLeave={onPortPointerLeave}
+          activePortId={activePortId}
+        />
+      )}
+      <div className={styles.accentBar} />
+      <header className={styles.header}>
+        <p className={styles.title}>{title}</p>
+        {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
+      </header>
+      <div className={styles.body}>{children}</div>
+    </article>
+  )
+}
