@@ -269,16 +269,6 @@ export default function WorkflowPage() {
     }))
   }, [setNodes])
 
-  const handleSelectionBoxComplete = useCallback((nodeIds: string[], additive: boolean) => {
-    if (additive) {
-      setSelectedNodeIds((previousNodeIds) => Array.from(new Set([...previousNodeIds, ...nodeIds])))
-      setContextMenu(null)
-      return
-    }
-
-    replaceSelection(nodeIds)
-  }, [replaceSelection, setSelectedNodeIds])
-
   const handlePortClick = useCallback((node: WorkflowNode, portId: string, direction: WorkflowPortDirection) => {
     if (connectionDraft && direction === 'input') {
       commitConnection(connectionDraft, { nodeId: node.id, portId })
@@ -400,7 +390,6 @@ export default function WorkflowPage() {
           onNodeContextMenu={handleNodeContextMenu}
           onBackgroundClick={handleBackgroundClick}
           onNodesMove={handleNodesMove}
-          onSelectionBoxComplete={handleSelectionBoxComplete}
           onPortClick={handlePortClick}
           onPortPointerDown={handlePortPointerDown}
           onPortPointerEnter={handlePortPointerEnter}

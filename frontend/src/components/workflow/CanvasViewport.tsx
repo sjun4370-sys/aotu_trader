@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import type { MutableRefObject, ReactNode } from 'react'
 import type {
   MouseEvent as ReactMouseEvent,
@@ -7,7 +7,6 @@ import type {
 import type { WorkflowConnectionDraft, WorkflowEdge, WorkflowNode, WorkflowPort } from '../../types/workflow'
 import type {
   WorkflowCanvasOffset,
-  WorkflowMarqueeRect,
   WorkflowViewportPoint
 } from '../../hooks/useWorkflowCanvas'
 import CanvasNode from './CanvasNode'
@@ -28,7 +27,6 @@ interface CanvasViewportProps {
   onNodeContextMenu?: (event: ReactMouseEvent<HTMLDivElement>, node: WorkflowNode) => void
   onBackgroundClick?: () => void
   onNodesMove?: (nodeIds: string[], updates: Record<string, WorkflowViewportPoint>) => void
-  onSelectionBoxComplete?: (nodeIds: string[], additive: boolean) => void
   onPortClick?: (node: WorkflowNode, portId: string, direction: 'input' | 'output') => void
   onPortPointerDown?: (event: ReactPointerEvent<HTMLButtonElement>, node: WorkflowNode, port: WorkflowPort) => void
   onPortPointerEnter?: (node: WorkflowNode, port: WorkflowPort) => void
@@ -39,22 +37,18 @@ interface CanvasViewportProps {
   onCanvasWheelZoom?: (point: WorkflowViewportPoint, deltaY: number) => void
 }
 
-interface DragState {
+interface NodeDragInteraction {
+  type: 'node-drag'
   originNodeId: string
   nodeIds: string[]
-  startPointerX: number
-  startPointerY: number
+  startClientX: number
+  startClientY: number
   startPositions: Record<string, WorkflowViewportPoint>
   moved: boolean
 }
 
-interface MarqueeState {
-  startClientX: number
-  startClientY: number
-  additive: boolean
-}
-
-interface PanState {
+interface PanInteraction {
+  type: 'pan'
   startClientX: number
   startClientY: number
   startOffsetX: number
@@ -62,16 +56,7 @@ interface PanState {
   moved: boolean
 }
 
-const DRAG_THRESHOLD = 4
-
-function normalizeRect(x1: number, y1: number, x2: number, y2: number): WorkflowMarqueeRect {
-  return {
-    left: Math.min(x1, x2),
-    top: Math.min(y1, y2),
-    width: Math.abs(x2 - x1),
-    height: Math.abs(y2 - y1)
-  }
-}
+type InteractionState = NodeDragInteraction | PanInteraction | null
 
 export default function CanvasViewport({
   zoom,
@@ -87,7 +72,6 @@ export default function CanvasViewport({
   onNodeContextMenu,
   onBackgroundClick,
   onNodesMove,
-  onSelectionBoxComplete,
   onPortClick,
   onPortPointerDown,
   onPortPointerEnter,
@@ -98,19 +82,8 @@ export default function CanvasViewport({
   onCanvasWheelZoom
 }: CanvasViewportProps) {
   const internalViewportRef = useRef<HTMLElement | null>(null)
-  const dragRef = useRef<DragState | null>(null)
-  const marqueeRef = useRef<MarqueeState | null>(null)
-  const panRef = useRef<PanState | null>(null)
+  const interactionRef = useRef<InteractionState>(null)
   const suppressClickNodeIdRef = useRef<string | null>(null)
-  const [marqueeRect, setMarqueeRect] = useState<WorkflowMarqueeRect | null>(null)
-
-  const isBackgroundTarget = useCallback((target: EventTarget | null) => {
-    if (!(target instanceof HTMLElement)) {
-      return false
-    }
-
-    return target.closest('[data-testid^="canvas-node-"]') === null && target.closest('[data-testid="node-context-menu"]') === null
-  }, [])
 
   const setViewportElement = useCallback((element: HTMLElement | null) => {
     internalViewportRef.current = element
@@ -118,6 +91,17 @@ export default function CanvasViewport({
       viewportRef.current = element
     }
   }, [viewportRef])
+
+  const isBackgroundTarget = useCallback((target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) {
+      return false
+    }
+
+    return (
+      target.closest('[data-testid^="canvas-node-"]') === null &&
+      target.closest('[data-testid="node-context-menu"]') === null
+    )
+  }, [])
 
   const resolveCanvasPoint = useCallback((clientX: number, clientY: number) => {
     const viewport = internalViewportRef.current
@@ -145,17 +129,14 @@ export default function CanvasViewport({
     }
   }, [])
 
+  const clearInteraction = useCallback(() => {
+    interactionRef.current = null
+  }, [])
+
   const handleNodePointerDown = useCallback((event: ReactPointerEvent, node: WorkflowNode) => {
     event.stopPropagation()
-    if (event.button !== 0) {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey) {
       return
-    }
-    if (event.ctrlKey || event.metaKey) {
-      return
-    }
-
-    if (typeof event.currentTarget.setPointerCapture === 'function') {
-      event.currentTarget.setPointerCapture(event.pointerId)
     }
 
     const nodeIds = selectedNodeIds.includes(node.id) ? selectedNodeIds : [node.id]
@@ -169,11 +150,12 @@ export default function CanvasViewport({
         .map((item) => [item.id, { ...item.position }])
     )
 
-    dragRef.current = {
+    interactionRef.current = {
+      type: 'node-drag',
       originNodeId: node.id,
       nodeIds,
-      startPointerX: event.clientX,
-      startPointerY: event.clientY,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
       startPositions,
       moved: false
     }
@@ -184,142 +166,99 @@ export default function CanvasViewport({
       return
     }
 
-    if (typeof event.currentTarget.setPointerCapture === 'function') {
-      event.currentTarget.setPointerCapture(event.pointerId)
-    }
+    onBackgroundClick?.()
 
-    if (event.ctrlKey || event.metaKey) {
-      marqueeRef.current = {
-        startClientX: event.clientX,
-        startClientY: event.clientY,
-        additive: true
-      }
-      const viewportPoint = resolveViewportPoint(event.clientX, event.clientY)
-      if (!viewportPoint) {
-        return
-      }
-
-      setMarqueeRect({ left: viewportPoint.x, top: viewportPoint.y, width: 0, height: 0 })
-      return
-    }
-
-    panRef.current = {
+    interactionRef.current = {
+      type: 'pan',
       startClientX: event.clientX,
       startClientY: event.clientY,
       startOffsetX: canvasOffset.x,
       startOffsetY: canvasOffset.y,
       moved: false
     }
-  }, [canvasOffset.x, canvasOffset.y, isBackgroundTarget, resolveViewportPoint])
+  }, [canvasOffset.x, canvasOffset.y, isBackgroundTarget, onBackgroundClick])
 
-  const handlePointerMove = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-    const drag = dragRef.current
-    if (drag) {
-      const dx = (event.clientX - drag.startPointerX) / zoom
-      const dy = (event.clientY - drag.startPointerY) / zoom
-      if (!drag.moved && (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5)) {
-        drag.moved = true
+  const handleTrackedPointerMove = useCallback((clientX: number, clientY: number) => {
+    const interaction = interactionRef.current
+
+    if (!interaction) {
+      const point = resolveCanvasPoint(clientX, clientY)
+      if (point) {
+        onCanvasPointerMove?.(point)
       }
+      return
+    }
+
+    if (interaction.type === 'node-drag') {
+      const dx = (clientX - interaction.startClientX) / zoom
+      const dy = (clientY - interaction.startClientY) / zoom
+      if (!interaction.moved && (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5)) {
+        interaction.moved = true
+      }
+
       const updates = Object.fromEntries(
-        drag.nodeIds.map((nodeId) => {
-          const start = drag.startPositions[nodeId]
+        interaction.nodeIds.map((nodeId) => {
+          const start = interaction.startPositions[nodeId]
           return [nodeId, { x: start.x + dx, y: start.y + dy }]
         })
       )
-      onNodesMove?.(drag.nodeIds, updates)
+      onNodesMove?.(interaction.nodeIds, updates)
       return
     }
 
-    const pan = panRef.current
-    if (pan) {
-      const dx = event.clientX - pan.startClientX
-      const dy = event.clientY - pan.startClientY
-      if (!pan.moved && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) {
-        pan.moved = true
+    if (interaction.type === 'pan') {
+      const dx = clientX - interaction.startClientX
+      const dy = clientY - interaction.startClientY
+      if (!interaction.moved && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) {
+        interaction.moved = true
       }
+
       onCanvasPan?.({
-        x: pan.startOffsetX + dx,
-        y: pan.startOffsetY + dy
+        x: interaction.startOffsetX + dx,
+        y: interaction.startOffsetY + dy
       })
       return
     }
 
-    const marquee = marqueeRef.current
-    if (marquee) {
-      const viewportStart = resolveViewportPoint(marquee.startClientX, marquee.startClientY)
-      const viewportCurrent = resolveViewportPoint(event.clientX, event.clientY)
-      if (!viewportStart || !viewportCurrent) {
-        return
-      }
+  }, [onCanvasPan, onCanvasPointerMove, onNodesMove, resolveCanvasPoint, zoom])
 
-      setMarqueeRect(normalizeRect(viewportStart.x, viewportStart.y, viewportCurrent.x, viewportCurrent.y))
+  const handleTrackedPointerUp = useCallback(() => {
+    const interaction = interactionRef.current
+    clearInteraction()
+
+    if (!interaction) {
       return
     }
 
-    const point = resolveCanvasPoint(event.clientX, event.clientY)
-    if (point) {
-      onCanvasPointerMove?.(point)
-    }
-  }, [onCanvasPan, onCanvasPointerMove, onNodesMove, resolveCanvasPoint, resolveViewportPoint, zoom])
-
-  const handlePointerUp = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-    const drag = dragRef.current
-    dragRef.current = null
-    if (drag?.moved) {
-      suppressClickNodeIdRef.current = drag.originNodeId
-    }
-
-    const pan = panRef.current
-    panRef.current = null
-    if (pan?.moved) {
-      return
-    }
-
-    const marquee = marqueeRef.current
-    marqueeRef.current = null
-    if (!marquee) {
-      return
-    }
-
-    const viewportStart = resolveViewportPoint(marquee.startClientX, marquee.startClientY)
-    const viewportEnd = resolveViewportPoint(event.clientX, event.clientY)
-    setMarqueeRect(null)
-    if (!viewportStart || !viewportEnd) {
-      return
-    }
-
-    const rect = normalizeRect(viewportStart.x, viewportStart.y, viewportEnd.x, viewportEnd.y)
-    if (rect.width < DRAG_THRESHOLD && rect.height < DRAG_THRESHOLD) {
-      if (!marquee.additive) {
-        onBackgroundClick?.()
+    if (interaction.type === 'node-drag') {
+      if (interaction.moved) {
+        suppressClickNodeIdRef.current = interaction.originNodeId
       }
       return
     }
 
-    const canvasStart = resolveCanvasPoint(marquee.startClientX, marquee.startClientY)
-    const canvasEnd = resolveCanvasPoint(event.clientX, event.clientY)
-    if (!canvasStart || !canvasEnd) {
-      return
+    return
+  }, [clearInteraction])
+
+  useEffect(() => {
+    const handleWindowPointerMove = (event: PointerEvent) => {
+      handleTrackedPointerMove(event.clientX, event.clientY)
     }
 
-    const worldRect = normalizeRect(canvasStart.x, canvasStart.y, canvasEnd.x, canvasEnd.y)
-    const intersectedNodeIds = nodes
-      .filter((node) => {
-        const nodeLeft = node.position.x
-        const nodeTop = node.position.y
-        const nodeRight = node.position.x + node.size.width
-        const nodeBottom = node.position.y + node.size.height
-        return !(
-          nodeRight < worldRect.left ||
-          nodeLeft > worldRect.left + worldRect.width ||
-          nodeBottom < worldRect.top ||
-          nodeTop > worldRect.top + worldRect.height
-        )
-      })
-      .map((node) => node.id)
+    const handleWindowPointerUp = () => {
+      handleTrackedPointerUp()
+    }
 
-    onSelectionBoxComplete?.(intersectedNodeIds, marquee.additive)
-  }, [nodes, onBackgroundClick, onSelectionBoxComplete, resolveCanvasPoint, resolveViewportPoint])
+    window.addEventListener('pointermove', handleWindowPointerMove)
+    window.addEventListener('pointerup', handleWindowPointerUp)
+    window.addEventListener('pointercancel', handleWindowPointerUp)
+
+    return () => {
+      window.removeEventListener('pointermove', handleWindowPointerMove)
+      window.removeEventListener('pointerup', handleWindowPointerUp)
+      window.removeEventListener('pointercancel', handleWindowPointerUp)
+    }
+  }, [handleTrackedPointerMove, handleTrackedPointerUp])
 
   useEffect(() => {
     const viewport = internalViewportRef.current
@@ -339,8 +278,16 @@ export default function CanvasViewport({
         return
       }
 
+      if (event.shiftKey) {
+        onCanvasPan?.({
+          x: canvasOffset.x - event.deltaY,
+          y: canvasOffset.y
+        })
+        return
+      }
+
       onCanvasPan?.({
-        x: canvasOffset.x - (event.shiftKey ? event.deltaY : event.deltaX),
+        x: canvasOffset.x - event.deltaX,
         y: canvasOffset.y - event.deltaY
       })
     }
@@ -350,9 +297,10 @@ export default function CanvasViewport({
   }, [canvasOffset.x, canvasOffset.y, onCanvasPan, onCanvasWheelZoom, resolveViewportPoint])
 
   const handleBackgroundSurfaceClick = useCallback((event: ReactMouseEvent<HTMLElement>) => {
-    if (!isBackgroundTarget(event.target) || marqueeRef.current || dragRef.current || panRef.current?.moved) {
+    if (!isBackgroundTarget(event.target) || interactionRef.current?.type === 'pan') {
       return
     }
+
     onBackgroundClick?.()
   }, [isBackgroundTarget, onBackgroundClick])
 
@@ -374,9 +322,6 @@ export default function CanvasViewport({
       className={[styles.viewport, className].filter(Boolean).join(' ')}
       onClick={handleBackgroundSurfaceClick}
       onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
     >
       <div
         className={styles.grid}
@@ -418,18 +363,6 @@ export default function CanvasViewport({
           <p className={styles.emptyText}>拖拽左侧节点到画布开始构建工作流</p>
         ) : null}
       </div>
-      {marqueeRect ? (
-        <div
-          className={styles.marquee}
-          style={{
-            left: marqueeRect.left,
-            top: marqueeRect.top,
-            width: marqueeRect.width,
-            height: marqueeRect.height
-          }}
-          data-testid="workflow-marquee"
-        />
-      ) : null}
     </section>
   )
 }

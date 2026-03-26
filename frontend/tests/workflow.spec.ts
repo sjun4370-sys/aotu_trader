@@ -30,15 +30,6 @@ async function dragConnection(
   await page.mouse.up()
 }
 
-async function marqueeSelect(page: import('@playwright/test').Page, start: { x: number; y: number }, end: { x: number; y: number }) {
-  await page.keyboard.down('Control')
-  await page.mouse.move(start.x, start.y)
-  await page.mouse.down()
-  await page.mouse.move(end.x, end.y, { steps: 10 })
-  await page.mouse.up()
-  await page.keyboard.up('Control')
-}
-
 async function panCanvas(page: import('@playwright/test').Page, start: { x: number; y: number }, end: { x: number; y: number }) {
   await page.mouse.move(start.x, start.y)
   await page.mouse.down()
@@ -91,6 +82,16 @@ test('workflow canvas supports drag, inspector, and edge creation', async ({ pag
   await expect(page.getByTestId('node-inspector-panel')).toContainText('币种选择器')
   await expect(page.getByTestId('node-quick-popover')).toHaveCount(0)
 
+  const beforeSelectedPan = await page.getByTestId('workflow-content').getAttribute('style')
+  await panCanvas(page, { x: 540, y: 120 }, { x: 620, y: 200 })
+  const afterSelectedPan = await page.getByTestId('workflow-content').getAttribute('style')
+  expect(afterSelectedPan).not.toBe(beforeSelectedPan)
+  await expect(page.getByTestId('node-inspector-panel')).toHaveAttribute('data-visible', 'false')
+
+  await panCanvas(page, { x: 620, y: 200 }, { x: 700, y: 260 })
+  const afterSecondSelectedPan = await page.getByTestId('workflow-content').getAttribute('style')
+  expect(afterSecondSelectedPan).not.toBe(afterSelectedPan)
+
   await dragConnection(
     page,
     currencyNode.getByRole('button', { name: '输出端口 币种' }),
@@ -112,11 +113,6 @@ test('workflow canvas supports drag, inspector, and edge creation', async ({ pag
   await page.keyboard.up('Control')
   await expect(page.getByTestId('node-inspector-panel')).toHaveAttribute('data-visible', 'false')
 
-  await marqueeSelect(page, { x: 120, y: 80 }, { x: 900, y: 420 })
-  await expect(currencyNode).toHaveAttribute('aria-pressed', 'true')
-  await expect(marketNode).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByTestId('node-inspector-panel')).toHaveAttribute('data-visible', 'false')
-
   await page.locator('[data-testid="workflow-canvas"]').hover()
   await page.mouse.wheel(0, 240)
   await expect(page.getByTestId('workflow-content')).toHaveAttribute('style', /translate\([^,]+, -?\d+px\) scale\(1\)/)
@@ -136,6 +132,6 @@ test('workflow canvas supports drag, inspector, and edge creation', async ({ pag
   await expect(currencyNode).toHaveAttribute('aria-pressed', 'false')
   await expect(marketNode).toHaveAttribute('aria-pressed', 'false')
 
-  await page.mouse.click(520, 120)
+  await page.mouse.click(80, 80)
   await expect(page.getByTestId('node-inspector-panel')).toHaveAttribute('data-visible', 'false')
 })

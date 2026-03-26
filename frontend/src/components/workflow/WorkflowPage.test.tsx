@@ -270,6 +270,17 @@ describe('WorkflowPage', () => {
     expect(screen.getByText('110%')).toBeInTheDocument()
   })
 
+  it('uses shift-wheel for horizontal-only pan', () => {
+    render(<WorkflowPage />)
+
+    const canvas = screen.getByTestId('workflow-canvas')
+    const content = screen.getByTestId('workflow-content')
+
+    fireEvent.wheel(canvas, { deltaY: 120, shiftKey: true })
+
+    expect(content.getAttribute('style')).toContain('translate(-120px, 0px)')
+  })
+
   it('supports ctrl+a select all and escape clear', () => {
     render(<WorkflowPage />)
 
