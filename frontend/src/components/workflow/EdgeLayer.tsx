@@ -19,6 +19,7 @@ interface EdgeLayerProps {
   nodes: WorkflowNode[]
   selectedNodeIds: string[]
   connectionDraft?: WorkflowConnectionDraft | null
+  draggingNodeIds?: string[]
 }
 
 interface PortPosition {
@@ -64,11 +65,13 @@ function EdgePath({
   edge,
   selectedNodeIds,
   path,
+  dragging = false,
   preview = false
 }: {
   edge: WorkflowEdge | null
   selectedNodeIds: string[]
   path: ResolvedEdgePath
+  dragging?: boolean
   preview?: boolean
 }) {
   const [hovered, setHovered] = useState(false)
@@ -85,7 +88,12 @@ function EdgePath({
   let filter: string | undefined
   let pathClassName = styles.path
 
-  if (path.isDisabled) {
+  if (dragging) {
+    strokeWidth = preview ? 3 : 2.2
+    opacity = preview ? 0.82 : (path.isDisabled ? 0.34 : 0.72)
+    filter = undefined
+    pathClassName = styles.pathDragging
+  } else if (path.isDisabled) {
     strokeWidth = hovered ? 3.4 : 2.6
     opacity = hovered ? 0.86 : 0.42
     filter = hovered ? 'drop-shadow(0 0 6px rgba(148, 163, 184, 0.55))' : undefined
@@ -147,8 +155,10 @@ export default function EdgeLayer({
   edges,
   nodes,
   selectedNodeIds,
-  connectionDraft = null
+  connectionDraft = null,
+  draggingNodeIds = []
 }: EdgeLayerProps) {
+  const isDragging = draggingNodeIds.length > 0
   const resolvedPaths = useMemo(() => {
     return edges.flatMap((edge) => {
       const fromNode = nodes.find((node) => node.id === edge.fromNodeId)
@@ -215,10 +225,11 @@ export default function EdgeLayer({
           edge={path.edge}
           path={path}
           selectedNodeIds={selectedNodeIds}
+          dragging={isDragging}
         />
       ))}
       {draftPath ? (
-        <EdgePath edge={null} path={draftPath} selectedNodeIds={selectedNodeIds} preview />
+        <EdgePath edge={null} path={draftPath} selectedNodeIds={selectedNodeIds} dragging={isDragging} preview />
       ) : null}
     </svg>
   )

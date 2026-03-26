@@ -17,6 +17,11 @@
   stroke-linecap: round;
 }
 
+.pathDragging {
+  transition: none;
+  stroke-linecap: round;
+}
+
 .pathActive {
   stroke-dasharray: 12 6;
   animation: edgeFlow 1.5s linear infinite;

@@ -8,6 +8,8 @@ interface WorkflowNodeCardProps {
   subtitle?: string
   category?: WorkflowNodeCategory
   status?: WorkflowNodeStatus
+  selected?: boolean
+  dragging?: boolean
   inputs?: WorkflowPort[]
   outputs?: WorkflowPort[]
   children?: ReactNode
@@ -82,6 +84,8 @@ export default function WorkflowNodeCard({
   subtitle,
   category,
   status = 'enabled',
+  selected = false,
+  dragging = false,
   inputs = [],
   outputs = [],
   children,
@@ -96,7 +100,14 @@ export default function WorkflowNodeCard({
   const cardClass = [styles.card, className].filter(Boolean).join(' ')
 
   return (
-    <article className={cardClass} data-testid="workflow-node-card" data-category={category} data-status={status}>
+    <article
+      className={cardClass}
+      data-testid="workflow-node-card"
+      data-category={category}
+      data-status={status}
+      data-selected={selected ? 'true' : 'false'}
+      data-dragging={dragging ? 'true' : 'false'}
+    >
       {/* Input port dots — left edge */}
       {inputs.length > 0 && (
         <PortRail

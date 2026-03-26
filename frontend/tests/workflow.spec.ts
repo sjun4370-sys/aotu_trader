@@ -31,7 +31,10 @@ async function dragConnection(
     bubbles: true,
   })
   await expect(page.getByTestId('workflow-edge-preview')).toHaveCount(1)
-  await to.click({ force: true })
+  await page.waitForTimeout(50)
+  await to.evaluate((element) => {
+    (element as HTMLButtonElement).click()
+  })
 }
 
 async function panCanvas(page: import('@playwright/test').Page, start: { x: number; y: number }, end: { x: number; y: number }) {
