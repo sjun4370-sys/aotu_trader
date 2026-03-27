@@ -166,6 +166,7 @@ export default function WorkflowReactFlowViewport({
 }: WorkflowReactFlowViewportProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const draggingNodeIdsRef = useRef<string[]>([])
+  const [draggingNodeIds, setDraggingNodeIds] = useState<string[]>([])
   const [localViewport, setLocalViewport] = useState<Viewport>({
     x: canvasOffset.x,
     y: canvasOffset.y,
@@ -312,6 +313,7 @@ export default function WorkflowReactFlowViewport({
 
   const handleNodeDragStop = useCallback((_event: ReactMouseEvent, node: Node<WorkflowReactFlowNodeData>) => {
     draggingNodeIdsRef.current = draggingNodeIdsRef.current.filter((id) => id !== node.id)
+    setDraggingNodeIds(draggingNodeIdsRef.current)
     onNodesMove?.([node.id], {
       [node.id]: {
         x: node.position.x,
@@ -406,7 +408,7 @@ export default function WorkflowReactFlowViewport({
           nodes={edgeLayerNodes}
           selectedNodeIds={selectedNodeIds}
           connectionDraft={connectionDraft}
-          draggingNodeIds={draggingNodeIdsRef.current}
+          draggingNodeIds={draggingNodeIds}
         />
       </div>
     </div>

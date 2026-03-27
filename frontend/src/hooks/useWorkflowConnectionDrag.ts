@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
-import { getCanvasPointFromClient } from '../utils/workflow'
 import type {
   WorkflowConnectionDraft,
   WorkflowConnectionTarget,

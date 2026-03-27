@@ -2,6 +2,8 @@ import { useCallback, useState } from 'react'
 import type { WorkflowEdge, WorkflowNode, WorkflowNodePoint } from '../types/workflow'
 import { WORKFLOW_CANVAS_MIN_ZOOM, WORKFLOW_CANVAS_MAX_ZOOM, WORKFLOW_CANVAS_ZOOM_STEP } from '../constants'
 
+export { WORKFLOW_CANVAS_MIN_ZOOM, WORKFLOW_CANVAS_MAX_ZOOM }
+
 export interface WorkflowCanvasOffset {
   x: number
   y: number
