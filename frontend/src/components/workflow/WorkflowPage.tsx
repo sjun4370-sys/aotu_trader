@@ -111,6 +111,13 @@ export default function WorkflowPage() {
 
     const nextEdgeId = buildEdgeId(draft.fromNodeId, draft.fromPortId, target.nodeId, target.portId)
     setEdges((previousEdges) => {
+      const existingFromSameSource = previousEdges.some(
+        (edge) => edge.fromNodeId === draft.fromNodeId && edge.toNodeId === target.nodeId
+      )
+      if (existingFromSameSource) {
+        return previousEdges
+      }
+
       const withoutDuplicate = previousEdges.filter((edge) => edge.id !== nextEdgeId)
       return [
         ...withoutDuplicate,
