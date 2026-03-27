@@ -1,10 +1,11 @@
 """
 FastAPI 主应用
 """
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import trading
+from api.routers import trading, workflow
 
 app = FastAPI(
     title="OKX Trader API",
@@ -23,6 +24,7 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(trading.router, prefix="/api/trading", tags=["交易"])
+app.include_router(workflow.router, prefix="/api/workflow", tags=["workflow"])
 
 
 @app.get("/health")
