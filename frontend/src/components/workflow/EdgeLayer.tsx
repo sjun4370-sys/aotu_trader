@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { WorkflowConnectionDraft, WorkflowEdge, WorkflowNode, WorkflowNodeCategory } from '../../types/workflow'
-import { CANVAS_NODE_WIDTH } from '../../utils/workflow'
+import { getPortPoint } from '../../utils/workflow'
 import styles from './EdgeLayer.module.css'
 
 const CATEGORY_COLORS: Record<WorkflowNodeCategory, string> = {
@@ -10,9 +10,6 @@ const CATEGORY_COLORS: Record<WorkflowNodeCategory, string> = {
   ai: '#fb7185',
   tool: '#f59e0b'
 }
-
-const NODE_WIDTH = CANVAS_NODE_WIDTH
-const NODE_HEIGHT = 120
 
 interface EdgeLayerProps {
   edges: WorkflowEdge[]
@@ -27,22 +24,8 @@ interface PortPosition {
   y: number
 }
 
-function getPortPosition(
-  node: WorkflowNode,
-  portId: string,
-  direction: 'input' | 'output'
-): PortPosition | null {
-  const ports = direction === 'input' ? node.inputs : node.outputs
-  const portIndex = ports.findIndex((port) => port.id === portId)
-  if (portIndex === -1) {
-    return null
-  }
-
-  const gap = NODE_HEIGHT / (ports.length + 1)
-  return {
-    x: direction === 'input' ? node.position.x : node.position.x + NODE_WIDTH,
-    y: node.position.y + gap * (portIndex + 1)
-  }
+function getNodePortPosition(node: WorkflowNode, portId: string, direction: 'input' | 'output'): PortPosition | null {
+  return getPortPoint(node, portId, direction)
 }
 
 function buildBezierPath(x1: number, y1: number, x2: number, y2: number): string {
@@ -159,17 +142,19 @@ export default function EdgeLayer({
   draggingNodeIds = []
 }: EdgeLayerProps) {
   const isDragging = draggingNodeIds.length > 0
+  const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes])
+  const selectedNodeIdSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds])
   const resolvedPaths = useMemo(() => {
     return edges.flatMap((edge) => {
-      const fromNode = nodes.find((node) => node.id === edge.fromNodeId)
-      const toNode = nodes.find((node) => node.id === edge.toNodeId)
+      const fromNode = nodeById.get(edge.fromNodeId)
+      const toNode = nodeById.get(edge.toNodeId)
 
       if (!fromNode || !toNode) {
         return []
       }
 
-      const startPos = getPortPosition(fromNode, edge.fromPortId, 'output')
-      const endPos = getPortPosition(toNode, edge.toPortId, 'input')
+      const startPos = getNodePortPosition(fromNode, edge.fromPortId, 'output')
+      const endPos = getNodePortPosition(toNode, edge.toPortId, 'input')
       if (!startPos || !endPos) {
         return []
       }
@@ -183,23 +168,23 @@ export default function EdgeLayer({
         fromColor: isDisabled ? '#94a3b8' : CATEGORY_COLORS[fromNode.category],
         toColor: isDisabled ? '#cbd5e1' : CATEGORY_COLORS[toNode.category],
         isConnectedToSelection:
-          selectedNodeIds.includes(edge.fromNodeId) || selectedNodeIds.includes(edge.toNodeId),
+          selectedNodeIdSet.has(edge.fromNodeId) || selectedNodeIdSet.has(edge.toNodeId),
         isDisabled
       } satisfies ResolvedEdgePath]
     })
-  }, [edges, nodes, selectedNodeIds])
+  }, [edges, nodeById, selectedNodeIdSet])
 
   const draftPath = useMemo(() => {
     if (!connectionDraft) {
       return null
     }
 
-    const fromNode = nodes.find((node) => node.id === connectionDraft.fromNodeId)
+    const fromNode = nodeById.get(connectionDraft.fromNodeId)
     if (!fromNode) {
       return null
     }
 
-    const startPos = getPortPosition(fromNode, connectionDraft.fromPortId, 'output')
+    const startPos = getNodePortPosition(fromNode, connectionDraft.fromPortId, 'output')
     if (!startPos) {
       return null
     }
@@ -215,7 +200,7 @@ export default function EdgeLayer({
       isConnectedToSelection: true,
       isDisabled: false
     } satisfies ResolvedEdgePath
-  }, [connectionDraft, nodes])
+  }, [connectionDraft, nodeById])
 
   return (
     <svg className={styles.svg} aria-hidden="true" data-testid="edge-layer">

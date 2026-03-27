@@ -2,8 +2,10 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 import {
+  applyNodeChanges,
   Background,
   type Node,
+  type NodeChange,
   type NodeProps,
   ReactFlow,
   type Viewport,
@@ -44,7 +46,6 @@ interface WorkflowReactFlowViewportProps {
 interface WorkflowReactFlowNodeData extends Record<string, unknown> {
   workflowNode: WorkflowNode
   activePortId?: string | null
-  dragging?: boolean
   onNodeClick?: (nodeId: string, additive: boolean) => void
   onNodeContextMenu?: (event: ReactMouseEvent<HTMLDivElement>, node: WorkflowNode) => void
   onPortClick?: (node: WorkflowNode, portId: string, direction: 'input' | 'output') => void
@@ -69,7 +70,7 @@ function NodeContent({ node }: { node: WorkflowNode }) {
   }
 }
 
-function WorkflowReactFlowNodeComponent({ data, selected }: NodeProps<Node<WorkflowReactFlowNodeData>>) {
+function WorkflowReactFlowNodeComponent({ data, selected, dragging }: NodeProps<Node<WorkflowReactFlowNodeData>>) {
   const node = data.workflowNode
 
   return (
@@ -95,7 +96,7 @@ function WorkflowReactFlowNodeComponent({ data, selected }: NodeProps<Node<Workf
         category={node.category}
         status={node.status}
         selected={selected}
-        dragging={data.dragging}
+        dragging={dragging}
         inputs={node.inputs}
         outputs={node.outputs}
         onPortClick={(event, port) => {
@@ -124,6 +125,7 @@ const WorkflowReactFlowNode = memo(
   WorkflowReactFlowNodeComponent,
   (previousProps, nextProps) => (
     previousProps.selected === nextProps.selected &&
+    previousProps.dragging === nextProps.dragging &&
     previousProps.data.workflowNode === nextProps.data.workflowNode &&
     previousProps.data.activePortId === nextProps.data.activePortId &&
     previousProps.data.onNodeClick === nextProps.data.onNodeClick &&
@@ -163,13 +165,15 @@ export default function WorkflowReactFlowViewport({
   onViewportCommit,
 }: WorkflowReactFlowViewportProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null)
-  const [localNodes, setLocalNodes] = useState<WorkflowNode[]>(nodes)
-  const [draggingNodeIds, setDraggingNodeIds] = useState<string[]>([])
+  const draggingNodeIdsRef = useRef<string[]>([])
   const [localViewport, setLocalViewport] = useState<Viewport>({
     x: canvasOffset.x,
     y: canvasOffset.y,
     zoom,
   })
+
+  // React Flow 内部节点状态，用 applyNodeChanges 驱动，避免拖动时外部 nodes prop 覆盖内部位置
+  const [rfNodes, setRfNodes] = useState<Node<WorkflowReactFlowNodeData>[]>([])
 
   const setWrapperRef = useCallback((element: HTMLDivElement | null) => {
     wrapperRef.current = element
@@ -197,75 +201,66 @@ export default function WorkflowReactFlowViewport({
     return () => cancelAnimationFrame(frameId)
   }, [canvasOffset.x, canvasOffset.y, zoom])
 
+  // 外部 nodes 变化时同步到 rfNodes，但拖动期间只更新非拖动节点的非位置字段
   useEffect(() => {
-    const frameId = requestAnimationFrame(() => {
-      setLocalNodes((current) => {
-        const currentById = new Map(current.map((node) => [node.id, node]))
-        let changed = current.length !== nodes.length
+    setRfNodes((current) => {
+      const currentById = new Map(current.map((n) => [n.id, n]))
+      const dragging = draggingNodeIdsRef.current
 
-        const nextNodes = nodes.map((node) => {
-          const existing = currentById.get(node.id)
-          if (
-            existing &&
-            existing === node
-          ) {
-            return existing
+      const next = nodes.map((node) => {
+        const existing = currentById.get(node.id)
+        const isDragging = dragging.includes(node.id)
+
+        const data: WorkflowReactFlowNodeData = {
+          workflowNode: node,
+          activePortId: activePortId && node.inputs.some((p) => p.id === activePortId) ? activePortId : null,
+          onNodeClick,
+          onNodeContextMenu,
+          onPortClick,
+          onPortPointerDown,
+          onPortPointerUp,
+          onPortPointerEnter,
+          onPortPointerLeave,
+        }
+
+        if (!existing) {
+          return {
+            id: node.id,
+            type: 'workflowNode' as const,
+            position: node.position,
+            selected: selectedNodeIds.includes(node.id),
+            draggable: true,
+            selectable: false,
+            data,
           }
+        }
 
-          if (
-            existing &&
-            existing.type === node.type &&
-            existing.category === node.category &&
-            existing.label === node.label &&
-            existing.status === node.status &&
-            existing.position.x === node.position.x &&
-            existing.position.y === node.position.y &&
-            existing.size.width === node.size.width &&
-            existing.size.height === node.size.height &&
-            existing.inputs === node.inputs &&
-            existing.outputs === node.outputs &&
-            existing.config === node.config
-          ) {
-            return existing
-          }
-
-          changed = true
-          return node
-        })
-
-        return changed ? nextNodes : current
+        return {
+          ...existing,
+          // 拖动中保留 React Flow 内部位置，不用外部 position 覆盖
+          position: isDragging ? existing.position : node.position,
+          selected: selectedNodeIds.includes(node.id),
+          data,
+        }
       })
+
+      return next
     })
+  }, [nodes, selectedNodeIds, activePortId, onNodeClick, onNodeContextMenu, onPortClick, onPortPointerDown, onPortPointerUp, onPortPointerEnter, onPortPointerLeave])
 
-    return () => cancelAnimationFrame(frameId)
-  }, [nodes])
+  const handleNodesChange = useCallback((changes: NodeChange<Node<WorkflowReactFlowNodeData>>[]) => {
+    setRfNodes((current) => applyNodeChanges(changes, current))
+  }, [])
 
-  const sourceNodes = localNodes.length === nodes.length ? localNodes : nodes
-
-  const reactFlowNodes = useMemo<Node<WorkflowReactFlowNodeData>[]>(() => (
-    sourceNodes.map((node) => {
-      return {
-      id: node.id,
-      type: 'workflowNode',
-      position: node.position,
-      selected: selectedNodeIds.includes(node.id),
-      draggable: true,
-      selectable: false,
-      data: {
-        workflowNode: node,
-        activePortId: activePortId && node.inputs.some((port) => port.id === activePortId) ? activePortId : null,
-        dragging: draggingNodeIds.includes(node.id),
-        onNodeClick,
-        onNodeContextMenu,
-        onPortClick,
-        onPortPointerDown,
-        onPortPointerUp,
-        onPortPointerEnter,
-        onPortPointerLeave,
-      },
-    }
+  // 用于 EdgeLayer 的节点位置（从 rfNodes 取，保持与 React Flow 渲染同步）
+  const edgeLayerNodes = useMemo<WorkflowNode[]>(() => (
+    rfNodes.map((rfNode) => {
+      const workflowNode = rfNode.data.workflowNode
+      return rfNode.position === workflowNode.position
+        ? workflowNode
+        : { ...workflowNode, position: rfNode.position }
     })
-  ), [activePortId, draggingNodeIds, onNodeClick, onNodeContextMenu, onPortClick, onPortPointerDown, onPortPointerEnter, onPortPointerLeave, onPortPointerUp, selectedNodeIds, sourceNodes])
+  ), [rfNodes])
 
   const handleWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -316,12 +311,7 @@ export default function WorkflowReactFlowViewport({
   }, [onViewportLiveChange])
 
   const handleNodeDragStop = useCallback((_event: ReactMouseEvent, node: Node<WorkflowReactFlowNodeData>) => {
-    setDraggingNodeIds((current) => current.filter((id) => id !== node.id))
-    setLocalNodes((current) => current.map((currentNode) => (
-      currentNode.id === node.id
-        ? { ...currentNode, position: { x: node.position.x, y: node.position.y } }
-        : currentNode
-    )))
+    draggingNodeIdsRef.current = draggingNodeIdsRef.current.filter((id) => id !== node.id)
     onNodesMove?.([node.id], {
       [node.id]: {
         x: node.position.x,
@@ -331,12 +321,9 @@ export default function WorkflowReactFlowViewport({
   }, [onNodesMove])
 
   const handleNodeDrag = useCallback((_event: ReactMouseEvent, node: Node<WorkflowReactFlowNodeData>) => {
-    setDraggingNodeIds((current) => (current.includes(node.id) ? current : [...current, node.id]))
-    setLocalNodes((current) => current.map((currentNode) => (
-      currentNode.id === node.id
-        ? { ...currentNode, position: { x: node.position.x, y: node.position.y } }
-        : currentNode
-    )))
+    if (!draggingNodeIdsRef.current.includes(node.id)) {
+      draggingNodeIdsRef.current = [...draggingNodeIdsRef.current, node.id]
+    }
   }, [])
 
   const handleMove = useCallback((_event: MouseEvent | TouchEvent | null, nextViewport: Viewport) => {
@@ -382,7 +369,7 @@ export default function WorkflowReactFlowViewport({
         }}
       />
       <ReactFlow
-        nodes={reactFlowNodes}
+        nodes={rfNodes}
         edges={[]}
         nodeTypes={workflowNodeTypes}
         fitView={false}
@@ -396,8 +383,10 @@ export default function WorkflowReactFlowViewport({
         viewport={localViewport}
         onMove={handleMove}
         onMoveEnd={handleMoveEnd}
+        onNodesChange={handleNodesChange}
         onNodeDrag={handleNodeDrag}
         onNodeDragStop={handleNodeDragStop}
+        onlyRenderVisibleElements={false}
         onPaneClick={onBackgroundClick}
         proOptions={{ hideAttribution: true }}
       >
@@ -414,10 +403,10 @@ export default function WorkflowReactFlowViewport({
       >
         <EdgeLayer
           edges={edges}
-          nodes={sourceNodes}
+          nodes={edgeLayerNodes}
           selectedNodeIds={selectedNodeIds}
           connectionDraft={connectionDraft}
-          draggingNodeIds={draggingNodeIds}
+          draggingNodeIds={draggingNodeIdsRef.current}
         />
       </div>
     </div>

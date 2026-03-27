@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
+import { getCanvasPointFromClient } from '../utils/workflow'
 import type {
   WorkflowConnectionDraft,
   WorkflowConnectionTarget,

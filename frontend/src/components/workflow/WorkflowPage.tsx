@@ -15,25 +15,28 @@ import { useWorkflowPortInteractions } from '../../hooks/useWorkflowPortInteract
 import type { WorkflowViewportStateRef } from '../../hooks/useWorkflowConnectionDrag'
 import type {
   WorkflowConnectionDraft,
+  WorkflowConnectionTarget,
   WorkflowNode,
   WorkflowNodeStatus,
   WorkflowPortDirection
 } from '../../types/workflow'
-import { buildEdgeId, buildNodeId, CANVAS_NODE_WIDTH, snapToGrid } from '../../utils/workflow'
+import {
+  buildEdgeId,
+  buildNodeId,
+  CANVAS_NODE_HEIGHT,
+  CANVAS_NODE_WIDTH,
+  getCanvasPointFromClient,
+  getPortPoint,
+  snapToGrid,
+} from '../../utils/workflow'
 import styles from './WorkflowPage.module.css'
 
-const NODE_HEIGHT = 120
 const CANVAS_GRID_SIZE = 12
 
 interface ContextMenuState {
   nodeId: string
   left: number
   top: number
-}
-
-interface ConnectionTarget {
-  nodeId: string
-  portId: string
 }
 
 export default function WorkflowPage() {
@@ -57,10 +60,10 @@ export default function WorkflowPage() {
     resetView
   } = useWorkflowCanvas()
   const [connectionDraft, setConnectionDraft] = useState<WorkflowConnectionDraft | null>(null)
-  const [connectionTarget, setConnectionTarget] = useState<ConnectionTarget | null>(null)
+  const [connectionTarget, setConnectionTarget] = useState<WorkflowConnectionTarget | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const connectionDraftRef = useRef<WorkflowConnectionDraft | null>(null)
-  const connectionTargetRef = useRef<ConnectionTarget | null>(null)
+  const connectionTargetRef = useRef<WorkflowConnectionTarget | null>(null)
   const pointerClientRef = useRef<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
@@ -98,20 +101,11 @@ export default function WorkflowPage() {
     setContextMenu(null)
   }, [setSelectedNodeIds])
 
-  const getPortPoint = useCallback((node: WorkflowNode, portId: string, direction: WorkflowPortDirection) => {
-    const ports = direction === 'output' ? node.outputs : node.inputs
-    const portIndex = ports.findIndex((port) => port.id === portId)
-    if (portIndex === -1) {
-      return null
-    }
+  const resolvePortPoint = useCallback((node: WorkflowNode, portId: string, direction: WorkflowPortDirection) => (
+    getPortPoint(node, portId, direction)
+  ), [])
 
-    return {
-      x: direction === 'output' ? node.position.x + CANVAS_NODE_WIDTH : node.position.x,
-      y: node.position.y + (NODE_HEIGHT / (ports.length + 1)) * (portIndex + 1)
-    }
-  }, [])
-
-  const commitConnection = useCallback((draft: WorkflowConnectionDraft, target: ConnectionTarget) => {
+  const commitConnection = useCallback((draft: WorkflowConnectionDraft, target: WorkflowConnectionTarget) => {
     if (draft.fromNodeId === target.nodeId) {
       return
     }
@@ -144,7 +138,7 @@ export default function WorkflowPage() {
     setConnectionDraft,
     setConnectionTarget,
     commitConnection,
-    getPortPoint,
+    getPortPoint: resolvePortPoint,
   })
 
   const createNode = useCallback((payload: PaletteDragPayload) => {
@@ -154,16 +148,12 @@ export default function WorkflowPage() {
     }
 
     const rect = viewport.getBoundingClientRect()
-    const rawX = payload.point.x - payload.grabOffset.x - rect.left
-    const rawY = payload.point.y - payload.grabOffset.y - rect.top
-
+    const rawX = payload.point.x - payload.grabOffset.x
+    const rawY = payload.point.y - payload.grabOffset.y
     const viewportState = viewportStateRef.current
 
     const snappedPosition = snapToGrid(
-      {
-        x: (rawX - viewportState.x) / viewportState.zoom,
-        y: (rawY - viewportState.y) / viewportState.zoom
-      },
+      getCanvasPointFromClient(rawX, rawY, rect, viewportState),
       CANVAS_GRID_SIZE
     )
 
@@ -174,7 +164,7 @@ export default function WorkflowPage() {
       category: payload.item.category,
       label: payload.item.label,
       position: snappedPosition,
-      size: { width: CANVAS_NODE_WIDTH, height: NODE_HEIGHT },
+      size: { width: CANVAS_NODE_WIDTH, height: CANVAS_NODE_HEIGHT },
       inputs: payload.item.inputs,
       outputs: payload.item.outputs,
       config: {},
@@ -210,14 +200,18 @@ export default function WorkflowPage() {
     })
   }, [replaceSelection, selectedNodeIds])
 
-  const handleBackgroundClick = useCallback(() => {
-    setSelectedNodeIds([])
+  const clearTransientInteractionState = useCallback(() => {
     setConnectionDraft(null)
     connectionDraftRef.current = null
     setConnectionTarget(null)
     connectionTargetRef.current = null
+  }, [setConnectionDraft, setConnectionTarget])
+
+  const handleBackgroundClick = useCallback(() => {
+    setSelectedNodeIds([])
+    clearTransientInteractionState()
     setContextMenu(null)
-  }, [setSelectedNodeIds])
+  }, [clearTransientInteractionState, setSelectedNodeIds])
 
   const handleDeleteNode = useCallback((nodeId: string) => {
     setNodes((previousNodes) => previousNodes.filter((node) => node.id !== nodeId))
@@ -225,8 +219,16 @@ export default function WorkflowPage() {
       (edge) => edge.fromNodeId !== nodeId && edge.toNodeId !== nodeId
     ))
     setSelectedNodeIds((previousNodeIds) => previousNodeIds.filter((id) => id !== nodeId))
-    setConnectionDraft((draft) => draft?.fromNodeId === nodeId ? null : draft)
-    setConnectionTarget((target) => target?.nodeId === nodeId ? null : target)
+    setConnectionDraft((draft) => {
+      const nextDraft = draft?.fromNodeId === nodeId ? null : draft
+      connectionDraftRef.current = nextDraft
+      return nextDraft
+    })
+    setConnectionTarget((target) => {
+      const nextTarget = target?.nodeId === nodeId ? null : target
+      connectionTargetRef.current = nextTarget
+      return nextTarget
+    })
     setContextMenu((menu) => menu?.nodeId === nodeId ? null : menu)
   }, [setEdges, setNodes, setSelectedNodeIds])
 
@@ -276,7 +278,7 @@ export default function WorkflowPage() {
     setConnectionTarget,
     replaceSelection,
     commitConnection,
-    getPortPoint,
+    getPortPoint: resolvePortPoint,
   })
 
   const handleViewportLiveChange = useCallback((viewport: { x: number; y: number; zoom: number }) => {
@@ -309,8 +311,7 @@ export default function WorkflowPage() {
       }
 
       if (event.key === 'Escape') {
-        setConnectionDraft(null)
-        setConnectionTarget(null)
+        clearTransientInteractionState()
         setContextMenu(null)
         setSelectedNodeIds([])
       }
@@ -318,7 +319,7 @@ export default function WorkflowPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [nodes, replaceSelection, setSelectedNodeIds])
+  }, [clearTransientInteractionState, nodes, replaceSelection, setSelectedNodeIds])
 
   return (
     <div ref={pageRef} data-testid="workflow-page" className={styles.page}>

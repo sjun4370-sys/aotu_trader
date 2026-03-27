@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { CSSProperties, MouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 import type { WorkflowNodeCategory, WorkflowNodeStatus, WorkflowPort } from '../../types/workflow'
+import { getPortOffset } from '../../utils/workflow'
 import styles from './WorkflowNodeCard.module.css'
 
 interface WorkflowNodeCardProps {
@@ -20,11 +21,6 @@ interface WorkflowNodeCardProps {
   onPortPointerEnter?: (port: WorkflowPort) => void
   onPortPointerLeave?: (port: WorkflowPort) => void
   activePortId?: string | null
-}
-
-function getPortOffset(index: number, total: number) {
-  const segments = total + 1
-  return `${((index + 1) / segments) * 100}%`
 }
 
 function PortRail({
@@ -52,7 +48,7 @@ function PortRail({
     <div className={railClassName}>
       {ports.map((port, index) => {
         const style = {
-          top: getPortOffset(index, ports.length)
+          top: `${getPortOffset(index, ports.length)}%`
         } satisfies CSSProperties
 
         return (
@@ -108,7 +104,6 @@ export default function WorkflowNodeCard({
       data-selected={selected ? 'true' : 'false'}
       data-dragging={dragging ? 'true' : 'false'}
     >
-      {/* Input port dots — left edge */}
       {inputs.length > 0 && (
         <PortRail
           ports={inputs}
@@ -121,7 +116,6 @@ export default function WorkflowNodeCard({
           activePortId={activePortId}
         />
       )}
-      {/* Output port dots — right edge */}
       {outputs.length > 0 && (
         <PortRail
           ports={outputs}
