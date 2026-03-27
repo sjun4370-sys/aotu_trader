@@ -33,6 +33,7 @@ env/
 .vscode/
 *.swp
 *.swo
+*.bak
 
 # Testing
 .pytest_cache/
@@ -56,3 +57,30 @@ frontend/src-tauri/target/
 # Node
 node_modules/
 .next/
+
+# Playwright test artifacts
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+
+# Tauri auto-generated
+frontend/src-tauri/gen/
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Kilo / editor
+.kilo/cache/
+
+# Python
+*.pyo
+.ruff_cache/
+.mypy_cache/
+
+# Coverage
+coverage/
+
+# Temp files
+*.tmp
