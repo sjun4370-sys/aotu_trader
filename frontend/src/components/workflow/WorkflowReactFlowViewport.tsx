@@ -14,11 +14,11 @@ import type { WorkflowCanvasOffset, WorkflowViewportPoint } from '../../hooks/us
 import type { WorkflowConnectionDraft, WorkflowEdge, WorkflowNode, WorkflowPort } from '../../types/workflow'
 import WorkflowNodeCard from './WorkflowNodeCard'
 import EdgeLayer from './EdgeLayer'
-import CurrencyNodeContent from './node-content/CurrencyNodeContent'
-import DataNodeContent from './node-content/DataNodeContent'
-import StrategyNodeContent from './node-content/StrategyNodeContent'
-import AINodeContent from './node-content/AINodeContent'
-import ToolNodeContent from './node-content/ToolNodeContent'
+import CurrencyNodeContent from '../node-content/CurrencyNodeContent'
+import DataNodeContent from '../node-content/DataNodeContent'
+import StrategyNodeContent from '../node-content/StrategyNodeContent'
+import AINodeContent from '../node-content/AINodeContent'
+import ToolNodeContent from '../node-content/ToolNodeContent'
 
 interface WorkflowReactFlowViewportProps {
   zoom: number
