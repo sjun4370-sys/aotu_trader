@@ -370,6 +370,7 @@ export default function WorkflowPage() {
       >
         <NodeInspector
           node={inspectorNode}
+          edges={edges}
           onClose={() => setSelectedNodeIds([])}
           onDelete={inspectorNode ? () => handleDeleteNode(inspectorNode.id) : undefined}
           onApply={inspectorNode ? (payload) => handleApplyConfig(inspectorNode.id, payload) : undefined}

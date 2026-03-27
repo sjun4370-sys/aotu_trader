@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { WorkflowNode, WorkflowNodeStatus } from '../../types/workflow'
+import type { WorkflowEdge, WorkflowNode, WorkflowNodeStatus } from '../../types/workflow'
 import styles from './NodeInspector.module.css'
 import {
   Select,
@@ -11,6 +11,7 @@ import {
 
 interface NodeInspectorProps {
   node: WorkflowNode | null
+  edges: WorkflowEdge[]
   onClose: () => void
   onDelete?: () => void
   onApply?: (payload: { config: Record<string, unknown>; status: WorkflowNodeStatus }) => void
@@ -31,11 +32,13 @@ const STATUS_OPTIONS: { value: WorkflowNodeStatus; label: string }[] = [
 
 function NodeInspectorContent({
   node,
+  edges,
   onClose,
   onDelete,
   onApply
 }: {
   node: WorkflowNode
+  edges: WorkflowEdge[]
   onClose: () => void
   onDelete?: () => void
   onApply?: (payload: { config: Record<string, unknown>; status: WorkflowNodeStatus }) => void
@@ -102,14 +105,24 @@ function NodeInspectorContent({
           {node.inputs.length > 0 ? (
             <div className={styles.portGroup}>
               <p className={styles.portGroupLabel}>输入端口</p>
-              {node.inputs.map((port) => (
-                <div key={port.id} className={styles.portRow}>
-                  <span className={styles.portName}>{port.label}</span>
-                  <span className={styles.portBadge} data-direction={port.direction}>
-                    输入
-                  </span>
-                </div>
-              ))}
+              {node.inputs.map((port) => {
+                const sources = edges
+                  .filter((e) => e.toNodeId === node.id && e.toPortId === port.id)
+                  .map((e) => e.fromNodeId)
+                return (
+                  <div key={port.id} className={styles.portRow}>
+                    <span className={styles.portName}>{port.label}</span>
+                    <span className={styles.portBadge} data-direction={port.direction}>
+                      输入
+                    </span>
+                    {sources.length > 0 && (
+                      <span className={styles.portSources}>
+                        来源: {sources.join(', ')}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           ) : null}
           {node.outputs.length > 0 ? (
@@ -155,7 +168,7 @@ function NodeInspectorContent({
   )
 }
 
-export default function NodeInspector({ node, onClose, onDelete, onApply }: NodeInspectorProps) {
+export default function NodeInspector({ node, edges, onClose, onDelete, onApply }: NodeInspectorProps) {
   const isVisible = node !== null
 
   return (
@@ -168,6 +181,7 @@ export default function NodeInspector({ node, onClose, onDelete, onApply }: Node
         <NodeInspectorContent
           key={node.id}
           node={node}
+          edges={edges}
           onClose={onClose}
           onDelete={onDelete}
           onApply={onApply}
