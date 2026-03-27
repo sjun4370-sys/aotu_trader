@@ -12,6 +12,7 @@ import {
 } from '../../hooks/useWorkflowCanvas'
 import { useWorkflowConnectionDrag } from '../../hooks/useWorkflowConnectionDrag'
 import { useWorkflowPortInteractions } from '../../hooks/useWorkflowPortInteractions'
+import { useWorkflowEngine } from '../../hooks/useWorkflowEngine'
 import type { WorkflowViewportStateRef } from '../../hooks/useWorkflowConnectionDrag'
 import type {
   WorkflowConnectionDraft,
@@ -20,6 +21,7 @@ import type {
   WorkflowNodeStatus,
   WorkflowPortDirection
 } from '../../types/workflow'
+import type { WorkflowExecutionStatus, NodeExecutionResult } from '../../types/workflowExecution'
 import {
   buildEdgeId,
   buildNodeId,
@@ -61,9 +63,13 @@ export default function WorkflowPage() {
   const [connectionDraft, setConnectionDraft] = useState<WorkflowConnectionDraft | null>(null)
   const [connectionTarget, setConnectionTarget] = useState<WorkflowConnectionTarget | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [executionState, setExecutionState] = useState<WorkflowExecutionStatus>('idle')
+  const [, setRunningNodeId] = useState<string | null>(null)
+  const [, setNodeResults] = useState<Map<string, NodeExecutionResult>>(new Map())
   const connectionDraftRef = useRef<WorkflowConnectionDraft | null>(null)
   const connectionTargetRef = useRef<WorkflowConnectionTarget | null>(null)
   const pointerClientRef = useRef<{ x: number; y: number } | null>(null)
+  const { runWorkflow } = useWorkflowEngine()
 
   useEffect(() => {
     connectionDraftRef.current = connectionDraft
@@ -255,6 +261,30 @@ export default function WorkflowPage() {
     )))
   }, [setNodes])
 
+  const handleRunWorkflow = useCallback(async () => {
+    setExecutionState('running')
+    setNodeResults(new Map())
+
+    await runWorkflow(
+      nodes,
+      edges,
+      (nodeId) => {
+        setRunningNodeId(nodeId)
+      },
+      (result) => {
+        setNodeResults(prev => new Map(prev).set(result.nodeId, result))
+        setRunningNodeId(null)
+      },
+      () => {},
+      (error) => {
+        setExecutionState('error')
+        console.error(error)
+      }
+    )
+
+    setExecutionState('completed')
+  }, [nodes, edges, runWorkflow])
+
   const handleNodesMove = useCallback((nodeIds: string[], updates: Record<string, WorkflowViewportPoint>) => {
     setNodes((previousNodes) => previousNodes.map((node) => {
       if (!nodeIds.includes(node.id)) {
@@ -330,6 +360,15 @@ export default function WorkflowPage() {
   return (
     <div ref={pageRef} data-testid="workflow-page" className={styles.page}>
       <PaletteFloatingPanel onDragEnd={createNode} />
+      <div className={styles.toolbar}>
+        <button
+          className={styles.runButton}
+          onClick={handleRunWorkflow}
+          disabled={executionState === 'running'}
+        >
+          {executionState === 'running' ? 'Running...' : 'Run'}
+        </button>
+      </div>
       <div className={styles.canvasWrapper}>
         <WorkflowReactFlowViewport
           zoom={zoom}

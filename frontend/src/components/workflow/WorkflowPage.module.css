@@ -7,6 +7,37 @@
   color: var(--wf-text);
 }
 
+.toolbar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  gap: 8px;
+}
+
+.runButton {
+  padding: 8px 20px;
+  border-radius: 6px;
+  border: none;
+  background: var(--wf-primary);
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.runButton:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.runButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .canvasWrapper {
   position: absolute;
   inset: 0;
