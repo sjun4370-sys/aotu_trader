@@ -11,6 +11,7 @@ import {
 
 interface NodeInspectorProps {
   node: WorkflowNode | null
+  nodes: WorkflowNode[]
   edges: WorkflowEdge[]
   onClose: () => void
   onDelete?: () => void
@@ -32,18 +33,21 @@ const STATUS_OPTIONS: { value: WorkflowNodeStatus; label: string }[] = [
 
 function NodeInspectorContent({
   node,
+  nodes,
   edges,
   onClose,
   onDelete,
   onApply
 }: {
   node: WorkflowNode
+  nodes: WorkflowNode[]
   edges: WorkflowEdge[]
   onClose: () => void
   onDelete?: () => void
   onApply?: (payload: { config: Record<string, unknown>; status: WorkflowNodeStatus }) => void
 }) {
   const [configText, setConfigText] = useState(() => JSON.stringify(node.config, null, 2))
+  const nodeById = new Map(nodes.map((n) => [n.id, n]))
   const [status, setStatus] = useState<WorkflowNodeStatus>(() => node.status)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -106,18 +110,19 @@ function NodeInspectorContent({
             <div className={styles.portGroup}>
               <p className={styles.portGroupLabel}>输入端口</p>
               {node.inputs.map((port) => {
-                const sources = edges
+                const sourceNodeIds = edges
                   .filter((e) => e.toNodeId === node.id && e.toPortId === port.id)
                   .map((e) => e.fromNodeId)
+                const sourceLabels = sourceNodeIds.map((id) => nodeById.get(id)?.label ?? id)
                 return (
                   <div key={port.id} className={styles.portRow}>
                     <span className={styles.portName}>{port.label}</span>
                     <span className={styles.portBadge} data-direction={port.direction}>
                       输入
                     </span>
-                    {sources.length > 0 && (
+                    {sourceLabels.length > 0 && (
                       <span className={styles.portSources}>
-                        来源: {sources.join(', ')}
+                        来源: {sourceLabels.join(', ')}
                       </span>
                     )}
                   </div>
@@ -168,7 +173,7 @@ function NodeInspectorContent({
   )
 }
 
-export default function NodeInspector({ node, edges, onClose, onDelete, onApply }: NodeInspectorProps) {
+export default function NodeInspector({ node, nodes, edges, onClose, onDelete, onApply }: NodeInspectorProps) {
   const isVisible = node !== null
 
   return (
@@ -181,6 +186,7 @@ export default function NodeInspector({ node, edges, onClose, onDelete, onApply 
         <NodeInspectorContent
           key={node.id}
           node={node}
+          nodes={nodes}
           edges={edges}
           onClose={onClose}
           onDelete={onDelete}
