@@ -29,9 +29,8 @@ import {
   getPortPoint,
   snapToGrid,
 } from '../../utils/workflow'
+import { CANVAS_GRID_SIZE } from '../../constants'
 import styles from './WorkflowPage.module.css'
-
-const CANVAS_GRID_SIZE = 12
 
 interface ContextMenuState {
   nodeId: string
