@@ -49,3 +49,10 @@ docs/*
 nul
 .claude/
 .worktrees/
+
+# Rust / Tauri build output
+frontend/src-tauri/target/
+
+# Node
+node_modules/
+.next/
