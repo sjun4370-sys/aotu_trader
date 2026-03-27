@@ -11,6 +11,14 @@ const createPort = (id: string, label: string, direction: WorkflowPortDirection)
   direction
 })
 
+const START_NODE: WorkflowNodeTemplate = {
+  type: 'start',
+  category: 'trigger',
+  label: '开始',
+  inputs: [],
+  outputs: [createPort('trigger', '触发', 'output')]
+}
+
 const CURRENCY_NODE: WorkflowNodeTemplate = {
   type: 'currency',
   category: 'currency',
@@ -109,6 +117,7 @@ const groupByCategory = (
 })
 
 export const WORKFLOW_PALETTE_GROUPS: WorkflowPaletteGroup[] = [
+  groupByCategory('trigger', '触发器', [START_NODE]),
   groupByCategory('currency', '币种', [CURRENCY_NODE]),
   groupByCategory('data', '数据类', [MARKET_NODE, ACCOUNT_NODE, INDICATOR_NODE]),
   groupByCategory('strategy', '策略类', [STRATEGY_NODE]),

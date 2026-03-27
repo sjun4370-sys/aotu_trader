@@ -1,12 +1,12 @@
 /**
  * 工作流节点类型
  */
-export type WorkflowNodeType = 'currency' | 'market' | 'account' | 'indicator' | 'strategy' | 'analysis' | 'trade' | 'condition' | 'loop'
+export type WorkflowNodeType = 'start' | 'currency' | 'market' | 'account' | 'indicator' | 'strategy' | 'analysis' | 'trade' | 'condition' | 'loop'
 
 /**
  * 工作流节点分类
  */
-export type WorkflowNodeCategory = 'currency' | 'data' | 'strategy' | 'ai' | 'tool'
+export type WorkflowNodeCategory = 'trigger' | 'currency' | 'data' | 'strategy' | 'ai' | 'tool'
 
 /**
  * 币种数据
