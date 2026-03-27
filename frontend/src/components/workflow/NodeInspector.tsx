@@ -1,15 +1,9 @@
 import { useState } from 'react'
 import type { WorkflowEdge, WorkflowNode, WorkflowNodeStatus } from '../../types/workflow'
 import { MultiSelect, type CurrencyOption } from '../ui/multi-select'
+import { StatusSelect } from '../ui/status-select'
 import { MOCK_CURRENCIES } from '../../data/currencies'
 import styles from './NodeInspector.module.css'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 
 interface NodeInspectorProps {
   node: WorkflowNode | null
@@ -27,11 +21,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   ai: 'AI',
   tool: '工具'
 }
-
-const STATUS_OPTIONS: { value: WorkflowNodeStatus; label: string }[] = [
-  { value: 'enabled', label: '启用' },
-  { value: 'disabled', label: '停用' }
-]
 
 function NodeInspectorContent({
   node,
@@ -89,25 +78,10 @@ function NodeInspectorContent({
           <dl className={styles.infoGrid}>
             <dt className={styles.infoLabel}>状态</dt>
             <dd className={styles.infoValue}>
-              <Select
+              <StatusSelect
                 value={status}
-                onValueChange={(value) => setStatus(value as WorkflowNodeStatus)}
-              >
-                <SelectTrigger className={styles.statusSelectTrigger}>
-                  <SelectValue placeholder="选择状态" />
-                </SelectTrigger>
-                <SelectContent className={styles.statusSelectContent}>
-                  {STATUS_OPTIONS.map((opt) => (
-                    <SelectItem
-                      key={opt.value}
-                      value={opt.value}
-                      className={opt.value === 'enabled' ? styles.statusItemEnabled : styles.statusItemDisabled}
-                    >
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={setStatus}
+              />
             </dd>
           </dl>
         </section>
