@@ -1,73 +1,74 @@
-# React + TypeScript + Vite
+# Aotu Trader Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+工作流可视化交易策略编辑器前端
 
-Currently, two official plugins are available:
+## 技术栈
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **框架**: React 19 + TypeScript
+- **构建工具**: Vite 8
+- **样式**: Tailwind CSS 4 + CSS Modules
+- **流程图**: @xyflow/react (React Flow)
+- **桌面应用**: Tauri 2
+- **状态管理**: React Hooks + Zustand
+- **测试**: Vitest + Playwright
 
-## React Compiler
+## 目录结构
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+src/
+├── assets/           # 静态资源
+├── components/       # React 组件
+│   ├── ui/          # 通用 UI 组件库
+│   ├── node-content/ # 工作流节点内容组件
+│   └── workflow/    # 工作流编辑器组件
+├── constants/        # 应用常量
+├── hooks/           # 自定义 React Hooks
+├── lib/             # 第三方库封装
+├── services/        # API 服务层
+├── store/           # 状态管理
+├── styles/          # 全局样式
+├── types/           # TypeScript 类型定义
+└── utils/           # 工具函数
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 开发命令
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+# 安装依赖
+npm install
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# 开发模式
+npm run dev
+
+# 类型检查
+npm run build
+
+# 代码检查
+npm run lint
+
+# 单元测试
+npm run test
+
+# E2E 测试
+npm run test:e2e
+
+# Tauri 开发
+npm run tauri dev
 ```
+
+## 环境变量
+
+复制 `.env.example` 为 `.env` 并配置:
+
+```
+VITE_API_URL=http://localhost:3000/api
+VITE_APP_TITLE=Aotu Trader
+```
+
+## 工作流编辑器
+
+工作流编辑器采用节点-连线模型:
+
+- **节点类型**: currency, market, account, indicator, strategy, analysis, trade, condition, loop
+- **节点分类**: currency, data, strategy, ai, tool
+- **交互**: 拖拽创建、连线、配置、删除
