@@ -26,3 +26,20 @@
   color: var(--wf-muted);
   font-style: italic;
 }
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  background: var(--wf-surface-strong);
+  border-radius: 4px;
+  color: var(--wf-text);
+}

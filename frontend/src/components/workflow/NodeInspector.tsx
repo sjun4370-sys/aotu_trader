@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import type { WorkflowEdge, WorkflowNode, WorkflowNodeStatus } from '../../types/workflow'
+import { MultiSelect, type CurrencyOption } from '../ui/multi-select'
+import { MOCK_CURRENCIES } from '../../data/currencies'
 import styles from './NodeInspector.module.css'
 import {
   Select,
@@ -50,10 +52,16 @@ function NodeInspectorContent({
   const nodeById = new Map(nodes.map((n) => [n.id, n]))
   const [status, setStatus] = useState<WorkflowNodeStatus>(() => node.status)
   const [errorMessage, setErrorMessage] = useState('')
+  const [selectedCurrencies, setSelectedCurrencies] = useState<string[]>(
+    () => (node.config.currencies as string[]) ?? []
+  )
 
   const handleApply = () => {
     try {
       const parsed = JSON.parse(configText) as Record<string, unknown>
+      if (node.type === 'currency') {
+        parsed.currencies = selectedCurrencies
+      }
       setErrorMessage('')
       onApply?.({ config: parsed, status })
     } catch {
@@ -150,13 +158,25 @@ function NodeInspectorContent({
 
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>配置</h3>
-          <textarea
-            className={styles.configTextarea}
-            value={configText}
-            onChange={(e) => setConfigText(e.target.value)}
-            placeholder="{}"
-            spellCheck={false}
-          />
+          {node.type === 'currency' ? (
+            <div className={styles.currencyConfig}>
+              <p className={styles.configLabel}>选择币种</p>
+              <MultiSelect
+                options={MOCK_CURRENCIES as CurrencyOption[]}
+                value={selectedCurrencies}
+                onChange={setSelectedCurrencies}
+                placeholder="搜索并选择币种..."
+              />
+            </div>
+          ) : (
+            <textarea
+              className={styles.configTextarea}
+              value={configText}
+              onChange={(e) => setConfigText(e.target.value)}
+              placeholder="{}"
+              spellCheck={false}
+            />
+          )}
           {errorMessage ? (
             <p className={styles.errorMessage} role="alert">
               {errorMessage}

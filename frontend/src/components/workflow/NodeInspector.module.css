@@ -267,6 +267,18 @@
   font-style: italic;
 }
 
+.currencyConfig {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.configLabel {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--wf-muted);
+}
+
 .configTextarea {
   width: 100%;
   min-height: 120px;

@@ -9,6 +9,18 @@ export type WorkflowNodeType = 'currency' | 'market' | 'account' | 'indicator' |
 export type WorkflowNodeCategory = 'currency' | 'data' | 'strategy' | 'ai' | 'tool'
 
 /**
+ * 币种数据
+ */
+export interface CurrencyItem {
+  code: string
+  name: string
+}
+
+export interface CurrencyData {
+  currencies: CurrencyItem[]
+}
+
+/**
  * 端口方向
  */
 export type WorkflowPortDirection = 'input' | 'output'
