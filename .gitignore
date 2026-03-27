@@ -43,7 +43,8 @@ htmlcov/
 # Logs
 *.log
 
-docs/*
+docs/skills-source/
+docs/superpowers/
 .playwright-mcp
 nul
 .claude/
