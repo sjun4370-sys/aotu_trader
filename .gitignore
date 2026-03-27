@@ -47,3 +47,4 @@ docs/*
 !docs/skills-source/**
 .playwright-mcp
 nul
+.claude/
