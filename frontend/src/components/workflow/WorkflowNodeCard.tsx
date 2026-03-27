@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 import type { CSSProperties, MouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 import type { WorkflowNodeCategory, WorkflowNodeStatus, WorkflowPort } from '../../types/workflow'
-import { getPortOffset } from '../../utils/workflow'
 import styles from './WorkflowNodeCard.module.css'
 
 interface WorkflowNodeCardProps {
@@ -46,11 +45,9 @@ function PortRail({
 
   return (
     <div className={railClassName}>
-      {ports.map((port, index) => {
-        const displayCount = ports.length
-        const topPercent = displayCount === 1 ? 50 : getPortOffset(index, displayCount)
+      {ports.map((port) => {
         const style = {
-          top: `${topPercent}%`
+          top: '50%'
         } satisfies CSSProperties
 
         return (
@@ -108,7 +105,7 @@ export default function WorkflowNodeCard({
     >
       {inputs.length > 0 && (
         <PortRail
-          ports={inputs.slice(0, 1)}
+          ports={inputs}
           side="left"
           onPortClick={onPortClick}
           onPortPointerDown={onPortPointerDown}
@@ -120,7 +117,7 @@ export default function WorkflowNodeCard({
       )}
       {outputs.length > 0 && (
         <PortRail
-          ports={outputs.slice(0, 1)}
+          ports={outputs}
           side="right"
           onPortClick={onPortClick}
           onPortPointerDown={onPortPointerDown}

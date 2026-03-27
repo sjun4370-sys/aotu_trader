@@ -47,10 +47,7 @@ const STRATEGY_NODE: WorkflowNodeTemplate = {
   type: 'strategy',
   category: 'strategy',
   label: '运行策略',
-  inputs: [
-    createPort('indicator', '指标', 'input'),
-    createPort('account', '账户', 'input')
-  ],
+  inputs: [createPort('in', '输入', 'input')],
   outputs: [createPort('signal', '信号', 'output')]
 }
 
@@ -66,10 +63,7 @@ const TRADE_NODE: WorkflowNodeTemplate = {
   type: 'trade',
   category: 'tool',
   label: '执行交易',
-  inputs: [
-    createPort('signal', '信号', 'input'),
-    createPort('analysis', '分析结果', 'input')
-  ],
+  inputs: [createPort('in', '输入', 'input')],
   outputs: [createPort('result', '结果', 'output')]
 }
 
@@ -78,10 +72,7 @@ const CONDITION_NODE: WorkflowNodeTemplate = {
   category: 'tool',
   label: '条件器',
   inputs: [createPort('in', '输入', 'input')],
-  outputs: [
-    createPort('true', '通过', 'output'),
-    createPort('false', '失败', 'output')
-  ]
+  outputs: [createPort('out', '输出', 'output')]
 }
 
 const LOOP_NODE: WorkflowNodeTemplate = {
@@ -89,10 +80,7 @@ const LOOP_NODE: WorkflowNodeTemplate = {
   category: 'tool',
   label: '循环组件',
   inputs: [createPort('in', '输入', 'input')],
-  outputs: [
-    createPort('out', '下一轮', 'output'),
-    createPort('done', '完成', 'output')
-  ]
+  outputs: [createPort('out', '输出', 'output')]
 }
 
 export const WORKFLOW_NODE_TEMPLATES: WorkflowNodeTemplate[] = [
