@@ -4,9 +4,8 @@ import type {
   WorkflowNodeType,
   WorkflowPortDirection,
 } from '../types/workflow'
-
-export const CANVAS_NODE_WIDTH = 280
-export const CANVAS_NODE_HEIGHT = 120
+import { CANVAS_NODE_WIDTH, CANVAS_NODE_HEIGHT } from '../constants/workflow'
+export { CANVAS_NODE_WIDTH, CANVAS_NODE_HEIGHT }
 
 export function buildNodeId(type: WorkflowNodeType, counter: number) {
   const normalizedType = type.replace(/[^a-z]/gi, '').toLowerCase()

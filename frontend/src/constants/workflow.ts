@@ -1,6 +1,6 @@
 export const CANVAS_GRID_SIZE = 12
-export const CANVAS_NODE_WIDTH = 200
-export const CANVAS_NODE_HEIGHT = 80
+export const CANVAS_NODE_WIDTH = 280
+export const CANVAS_NODE_HEIGHT = 120
 
 export const WORKFLOW_CANVAS_MIN_ZOOM = 0.5
 export const WORKFLOW_CANVAS_MAX_ZOOM = 1.8

@@ -79,19 +79,17 @@
 
 .portsLeft {
   position: absolute;
-  left: 0;
+  left: -5px;
   top: 0;
   height: 100%;
-  transform: translateX(-50%);
   width: 0;
 }
 
 .portsRight {
   position: absolute;
-  right: 0;
+  left: calc(100% - 5px);
   top: 0;
   height: 100%;
-  transform: translateX(50%);
   width: 0;
 }
 

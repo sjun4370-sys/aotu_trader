@@ -119,15 +119,7 @@ export function useWorkflowPortInteractions({
     const nextTarget = { nodeId: node.id, portId: port.id }
     setConnectionTarget(nextTarget)
     connectionTargetRef.current = nextTarget
-    const targetPoint = getPortPoint(node, port.id, 'input')
-    if (targetPoint) {
-      commitConnection({ ...activeDraft, point: targetPoint }, nextTarget)
-      setConnectionDraft(null)
-      connectionDraftRef.current = null
-      setConnectionTarget(null)
-      connectionTargetRef.current = null
-    }
-  }, [commitConnection, connectionDraft, connectionDraftRef, connectionTargetRef, getPortPoint, setConnectionDraft, setConnectionTarget])
+  }, [connectionDraft, connectionDraftRef, connectionTargetRef, setConnectionTarget])
 
   const handlePortPointerLeave = useCallback((node: WorkflowNode, port: WorkflowPort) => {
     setConnectionTarget((currentTarget) => {
