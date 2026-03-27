@@ -25,8 +25,8 @@
   position: absolute;
   right: 16px;
   top: 16px;
-  width: 280px;
-  max-height: calc(100% - 32px);
+  width: 320px;
+  height: 600px;
   border-radius: var(--wf-radius-panel);
   display: flex;
   flex-direction: column;
@@ -39,6 +39,7 @@
 
 .inspectorHidden {
   width: 0;
+  height: 600px;
   opacity: 0;
   pointer-events: none;
 }
