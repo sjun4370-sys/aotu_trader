@@ -21,6 +21,7 @@ interface WorkflowNodeCardProps {
   onPortPointerEnter?: (port: WorkflowPort) => void
   onPortPointerLeave?: (port: WorkflowPort) => void
   activePortId?: string | null
+  executionStatus?: 'idle' | 'running' | 'success' | 'error' | 'skipped'
 }
 
 function PortRail({
@@ -93,9 +94,11 @@ export default function WorkflowNodeCard({
   onPortPointerUp,
   onPortPointerEnter,
   onPortPointerLeave,
-  activePortId = null
+  activePortId = null,
+  executionStatus
 }: WorkflowNodeCardProps) {
-  const cardClass = [styles.card, className].filter(Boolean).join(' ')
+  const executionClass = executionStatus && executionStatus !== 'idle' ? styles[`node${executionStatus.charAt(0).toUpperCase() + executionStatus.slice(1)}`] : ''
+  const cardClass = [styles.card, executionClass, className].filter(Boolean).join(' ')
 
   return (
     <article

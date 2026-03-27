@@ -127,3 +127,21 @@
   outline-offset: 4px;
 }
 
+.nodeRunning {
+  box-shadow: 0 0 0 2px var(--color-primary, #6366f1), 0 0 20px var(--color-primary, #6366f1);
+  animation: pulse 1s infinite;
+}
+
+.nodeError {
+  box-shadow: 0 0 0 2px var(--color-error, #ef4444), 0 0 20px var(--color-error, #ef4444);
+}
+
+.nodeSuccess {
+  box-shadow: 0 0 0 2px var(--color-success, #22c55e);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+

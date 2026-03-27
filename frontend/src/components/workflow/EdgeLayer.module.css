@@ -46,3 +46,13 @@
     animation: none;
   }
 }
+
+.edgeActive {
+  stroke: var(--color-primary, #6366f1);
+  stroke-width: 3;
+}
+
+.edgeError {
+  stroke: var(--color-error, #ef4444);
+  stroke-width: 3;
+}
