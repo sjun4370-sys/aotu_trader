@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import type { WorkflowEdge, WorkflowNode, WorkflowNodePoint } from '../types/workflow'
+import { WORKFLOW_CANVAS_MIN_ZOOM, WORKFLOW_CANVAS_MAX_ZOOM, WORKFLOW_CANVAS_ZOOM_STEP } from '../constants'
 
 export interface WorkflowCanvasOffset {
   x: number
@@ -23,10 +24,6 @@ export interface WorkflowMarqueeRect {
   width: number
   height: number
 }
-
-export const WORKFLOW_CANVAS_MIN_ZOOM = 0.5
-export const WORKFLOW_CANVAS_MAX_ZOOM = 1.8
-export const WORKFLOW_CANVAS_ZOOM_STEP = 0.1
 
 const roundZoom = (zoom: number) => Math.round(zoom * 10) / 10
 
