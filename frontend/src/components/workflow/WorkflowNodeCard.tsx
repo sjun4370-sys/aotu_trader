@@ -47,8 +47,10 @@ function PortRail({
   return (
     <div className={railClassName}>
       {ports.map((port, index) => {
+        const displayCount = ports.length
+        const topPercent = displayCount === 1 ? 50 : getPortOffset(index, displayCount)
         const style = {
-          top: `${getPortOffset(index, ports.length)}%`
+          top: `${topPercent}%`
         } satisfies CSSProperties
 
         return (
@@ -106,7 +108,7 @@ export default function WorkflowNodeCard({
     >
       {inputs.length > 0 && (
         <PortRail
-          ports={inputs}
+          ports={inputs.slice(0, 1)}
           side="left"
           onPortClick={onPortClick}
           onPortPointerDown={onPortPointerDown}
@@ -118,7 +120,7 @@ export default function WorkflowNodeCard({
       )}
       {outputs.length > 0 && (
         <PortRail
-          ports={outputs}
+          ports={outputs.slice(0, 1)}
           side="right"
           onPortClick={onPortClick}
           onPortPointerDown={onPortPointerDown}
