@@ -50,9 +50,11 @@ export function getPortPoint(node: WorkflowNode, portId: string, direction: Work
     return null
   }
 
+  const yPercent = ports.length === 1 ? 50 : getPortOffset(portIndex, ports.length)
+
   return {
     x: direction === 'output' ? node.position.x + CANVAS_NODE_WIDTH : node.position.x,
-    y: node.position.y + (CANVAS_NODE_HEIGHT * 50) / 100,
+    y: node.position.y + (CANVAS_NODE_HEIGHT * yPercent) / 100,
   }
 }
 

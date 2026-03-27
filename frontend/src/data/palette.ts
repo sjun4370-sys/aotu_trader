@@ -72,7 +72,10 @@ const CONDITION_NODE: WorkflowNodeTemplate = {
   category: 'tool',
   label: '条件器',
   inputs: [createPort('in', '输入', 'input')],
-  outputs: [createPort('out', '输出', 'output')]
+  outputs: [
+    createPort('true', '通过', 'output'),
+    createPort('false', '失败', 'output')
+  ]
 }
 
 const LOOP_NODE: WorkflowNodeTemplate = {
