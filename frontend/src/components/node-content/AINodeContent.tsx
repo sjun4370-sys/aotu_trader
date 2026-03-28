@@ -4,11 +4,15 @@ import styles from './NodeContent.shared.module.css'
 interface Props { node: WorkflowNode }
 
 export default function AINodeContent({ node }: Props) {
-  const model = (node.config.model as string) ?? ''
+  const hasConfig = !!node.config.model
+
+  if (hasConfig) {
+    return <div className={styles.container} />
+  }
+
   return (
     <div className={styles.container}>
-      <p className={styles.label}>分析模型</p>
-      {model ? <p className={styles.value}>{model}</p> : <p className={styles.placeholder}>默认模型</p>}
+      <p className={styles.placeholder}>未配置</p>
     </div>
   )
 }

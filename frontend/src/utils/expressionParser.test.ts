@@ -80,4 +80,23 @@ describe('parseExpression', () => {
     const result = parseExpression("{{RSI.rsi}} <= 75", context)
     expect(result.result).toBe(true)
   })
+
+  it('parses string field comparison - equal', () => {
+    const result = parseExpression('{{RSI.signal}} == "sell"', context)
+    expect(result.result).toBe(true)
+    expect(result.details["RSI.signal"]).toBe("sell")
+  })
+
+  it('parses string field comparison - not equal', () => {
+    const result = parseExpression('{{RSI.signal}} != "buy"', context)
+    expect(result.result).toBe(true)
+  })
+
+  it('handles string with single quote', () => {
+    const ctx = {
+      "Test": { name: "O'Reilly" }
+    }
+    const result = parseExpression('{{Test.name}} == "O\'Reilly"', ctx)
+    expect(result.result).toBe(true)
+  })
 })

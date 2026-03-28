@@ -2,12 +2,15 @@
 工作流服务 - 封装工作流业务逻辑
 """
 
+from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from sqlalchemy.orm import Session
-from backend.database.workflow import Workflow
-from backend.api.schemas.workflow import WorkflowCreateRequest, WorkflowUpdateRequest
+from database.workflow import Workflow
+
+if TYPE_CHECKING:
+    from api.schemas.workflow import WorkflowCreateRequest, WorkflowUpdateRequest
 
 
 class WorkflowService:
@@ -15,17 +18,21 @@ class WorkflowService:
         self.session = session
 
     def create_workflow(self, request: WorkflowCreateRequest) -> Workflow:
-        workflow = Workflow(
-            id=f"wf_{uuid.uuid4().hex[:12]}",
-            name=request.name,
-            description=request.description,
-            nodes=[n.model_dump() for n in request.nodes],
-            edges=[e.model_dump() for e in request.edges],
-        )
-        self.session.add(workflow)
-        self.session.commit()
-        self.session.refresh(workflow)
-        return workflow
+        try:
+            workflow = Workflow(
+                id=f"wf_{uuid.uuid4().hex[:12]}",
+                name=request.name,
+                description=request.description,
+                nodes=[n.model_dump() for n in request.nodes],
+                edges=[e.model_dump() for e in request.edges],
+            )
+            self.session.add(workflow)
+            self.session.commit()
+            self.session.refresh(workflow)
+            return workflow
+        except Exception:
+            self.session.rollback()
+            raise
 
     def get_workflow(self, workflow_id: str) -> Optional[Workflow]:
         return self.session.query(Workflow).filter(Workflow.id == workflow_id).first()
@@ -50,9 +57,13 @@ class WorkflowService:
         if request.edges is not None:
             workflow.edges = [e.model_dump() for e in request.edges]
         workflow.updated_at = datetime.now(timezone.utc)
-        self.session.commit()
-        self.session.refresh(workflow)
-        return workflow
+        try:
+            self.session.commit()
+            self.session.refresh(workflow)
+            return workflow
+        except Exception:
+            self.session.rollback()
+            raise
 
     def delete_workflow(self, workflow_id: str) -> bool:
         workflow = (
@@ -60,6 +71,10 @@ class WorkflowService:
         )
         if not workflow:
             return False
-        self.session.delete(workflow)
-        self.session.commit()
-        return True
+        try:
+            self.session.delete(workflow)
+            self.session.commit()
+            return True
+        except Exception:
+            self.session.rollback()
+            raise

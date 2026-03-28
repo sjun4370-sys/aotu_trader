@@ -3,19 +3,28 @@ import styles from './NodeContent.shared.module.css'
 
 interface Props { node: WorkflowNode }
 
-const DATA_TYPE_LABELS: Record<string, string> = {
-  market: '市场数据',
-  account: '账户数据',
-  indicator: '技术指标'
-}
-
 export default function DataNodeContent({ node }: Props) {
-  const typeLabel = DATA_TYPE_LABELS[node.type] ?? '数据'
-  const interval = (node.config.interval as string) ?? ''
+  const { type, config } = node
+
+  // 检查是否有配置
+  let hasConfig = false
+  if (type === 'market') {
+    hasConfig = !!(config.dataType || config.interval)
+  } else if (type === 'account') {
+    hasConfig = !!config.account
+  } else if (type === 'indicator') {
+    hasConfig = !!config.indicator
+  }
+
+  // 如果有配置，body 留空（subtitle 已经显示完整信息）
+  if (hasConfig) {
+    return <div className={styles.container} />
+  }
+
+  // 没有配置时显示提示
   return (
     <div className={styles.container}>
-      <p className={styles.label}>{typeLabel}</p>
-      {interval ? <p className={styles.value}>{interval}</p> : <p className={styles.placeholder}>未配置</p>}
+      <p className={styles.placeholder}>未配置</p>
     </div>
   )
 }

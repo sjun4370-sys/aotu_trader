@@ -56,21 +56,22 @@
   position: absolute;
   right: 16px;
   top: 16px;
-  width: 320px;
-  height: 600px;
+  width: 380px;
+  min-height: 500px;
   border-radius: var(--wf-radius-panel);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   z-index: 50;
   transition: width 320ms cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 320ms cubic-bezier(0.4, 0, 0.2, 1);
+              opacity 320ms cubic-bezier(0.4, 0, 0.2, 1),
+              min-height 200ms ease;
   opacity: 1;
 }
 
 .inspectorHidden {
   width: 0;
-  height: 600px;
+  min-height: 0;
   opacity: 0;
   pointer-events: none;
 }

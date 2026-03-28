@@ -95,22 +95,6 @@ export interface WorkflowNode {
 export type WorkflowEdgeVisualState = 'default' | 'hover' | 'active' | 'dimmed'
 
 /**
- * 执行状态
- */
-export type WorkflowExecutionStatus = 'idle' | 'running' | 'success' | 'error' | 'skipped'
-
-/**
- * 节点执行结果
- */
-export interface NodeExecutionResult {
-  nodeId: string
-  status: WorkflowExecutionStatus
-  output: Record<string, unknown> | null
-  error: string | null
-  executionTime: number
-}
-
-/**
  * 工作流连接线
  */
 export interface WorkflowEdge {

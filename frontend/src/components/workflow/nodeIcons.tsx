@@ -3,8 +3,10 @@ import {
   ActivityIcon,
   BrainIcon,
   CircleDotIcon,
+  FlagIcon,
   GitBranchIcon,
   LayersIcon,
+  PlayIcon,
   RefreshCwIcon,
   TrendingUpIcon,
   WalletIcon,
@@ -17,6 +19,7 @@ interface IconProps {
 }
 
 export const NODE_TYPE_ICONS: Record<string, FC<IconProps>> = {
+  start: PlayIcon,
   currency: CircleDotIcon,
   market: TrendingUpIcon,
   account: WalletIcon,
@@ -25,5 +28,6 @@ export const NODE_TYPE_ICONS: Record<string, FC<IconProps>> = {
   analysis: BrainIcon,
   trade: ZapIcon,
   condition: GitBranchIcon,
-  loop: RefreshCwIcon
+  loop: RefreshCwIcon,
+  trigger: FlagIcon
 }

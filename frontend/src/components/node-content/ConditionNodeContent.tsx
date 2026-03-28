@@ -4,16 +4,15 @@ import styles from './NodeContent.shared.module.css'
 interface Props { node: WorkflowNode }
 
 export default function ConditionNodeContent({ node }: Props) {
-  const expression = (node.config.expression as string) ?? ''
-  
+  const hasConfig = !!node.config.expression
+
+  if (hasConfig) {
+    return <div className={styles.container} />
+  }
+
   return (
     <div className={styles.container}>
-      <p className={styles.label}>条件表达式</p>
-      {expression ? (
-        <p className={styles.value}>{expression}</p>
-      ) : (
-        <p className={styles.placeholder}>未配置</p>
-      )}
+      <p className={styles.placeholder}>未配置</p>
     </div>
   )
 }

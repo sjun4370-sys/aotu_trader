@@ -7,12 +7,29 @@ from typing import Optional, List, Any
 from datetime import datetime
 
 
+class WorkflowPortSchema(BaseModel):
+    id: str
+    label: str
+    direction: str
+
+
+class WorkflowNodeSizeSchema(BaseModel):
+    width: float
+    height: float
+
+
 class WorkflowNodeSchema(BaseModel):
     id: str
     type: str
     customName: str
+    category: str
+    label: str
     position: dict
+    size: WorkflowNodeSizeSchema
+    inputs: List[WorkflowPortSchema]
+    outputs: List[WorkflowPortSchema]
     config: dict
+    status: str
 
 
 class WorkflowEdgeSchema(BaseModel):

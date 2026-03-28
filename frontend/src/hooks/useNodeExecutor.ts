@@ -8,10 +8,23 @@ export function useNodeExecutor() {
   ): Promise<NodeExecutionResult> => {
     const startTime = Date.now()
     
+    const nodeType = getNodeType(context.config)
+    if (!nodeType) {
+      return {
+        nodeId: context.nodeId,
+        customName: context.customName,
+        status: 'error' as WorkflowExecutionStatus,
+        output: null,
+        error: 'Missing nodeType in config',
+        startTime,
+        endTime: Date.now()
+      }
+    }
+    
     try {
       const response = await simulateNode({
         nodeId: context.nodeId,
-        nodeType: getNodeType(context.config),
+        nodeType,
         customName: context.customName,
         config: context.config,
         inputs: context.inputs
@@ -42,6 +55,10 @@ export function useNodeExecutor() {
   return { executeNode }
 }
 
-function getNodeType(config: Record<string, unknown>): string {
-  return (config.nodeType as string) || 'unknown'
+function getNodeType(config: Record<string, unknown>): string | null {
+  const nodeType = config.nodeType
+  if (typeof nodeType !== 'string') {
+    return null
+  }
+  return nodeType
 }

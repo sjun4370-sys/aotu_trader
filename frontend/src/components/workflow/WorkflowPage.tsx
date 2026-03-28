@@ -64,8 +64,11 @@ export default function WorkflowPage() {
   const [connectionTarget, setConnectionTarget] = useState<WorkflowConnectionTarget | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [executionState, setExecutionState] = useState<WorkflowExecutionStatus>('idle')
-  const [, setRunningNodeId] = useState<string | null>(null)
-  const [, setNodeResults] = useState<Map<string, NodeExecutionResult>>(new Map())
+  // TODO: Task 12 - integrate runningNodeId into UI for visual feedback
+  const [runningNodeId, setRunningNodeId] = useState<string | null>(null)
+  // TODO: Task 12 - integrate nodeResults into UI to show execution results
+  const [nodeResults, setNodeResults] = useState<Map<string, NodeExecutionResult>>(new Map())
+  const [activeEdgeIds, setActiveEdgeIds] = useState<Set<string>>(new Set())
   const connectionDraftRef = useRef<WorkflowConnectionDraft | null>(null)
   const connectionTargetRef = useRef<WorkflowConnectionTarget | null>(null)
   const pointerClientRef = useRef<{ x: number; y: number } | null>(null)
@@ -170,9 +173,11 @@ export default function WorkflowPage() {
     )
 
     nodeCounterRef.current += 1
+    const nodeId = buildNodeId(payload.item.type, nodeCounterRef.current)
     const newNode: WorkflowNode = {
-      id: buildNodeId(payload.item.type, nodeCounterRef.current),
+      id: nodeId,
       type: payload.item.type,
+      customName: `${payload.item.label}_${nodeCounterRef.current}`,
       category: payload.item.category,
       label: payload.item.label,
       position: snappedPosition,
@@ -262,27 +267,36 @@ export default function WorkflowPage() {
   }, [setNodes])
 
   const handleRunWorkflow = useCallback(async () => {
-    setExecutionState('running')
+    setExecutionState('idle')
     setNodeResults(new Map())
+    setRunningNodeId(null)
+    setActiveEdgeIds(new Set())
+    setExecutionState('running')
 
-    await runWorkflow(
-      nodes,
-      edges,
-      (nodeId) => {
-        setRunningNodeId(nodeId)
-      },
-      (result) => {
-        setNodeResults(prev => new Map(prev).set(result.nodeId, result))
-        setRunningNodeId(null)
-      },
-      () => {},
-      (error) => {
-        setExecutionState('error')
-        console.error(error)
-      }
-    )
-
-    setExecutionState('completed')
+    try {
+      await runWorkflow(
+        nodes,
+        edges,
+        (nodeId) => {
+          setRunningNodeId(nodeId)
+        },
+        (result) => {
+          setNodeResults(prev => new Map(prev).set(result.nodeId, result))
+          setRunningNodeId(null)
+        },
+        (edgeId) => {
+          setActiveEdgeIds(prev => new Set(prev).add(edgeId))
+        },
+        (error) => {
+          setExecutionState('error')
+          console.error(error)
+        }
+      )
+      setExecutionState('completed')
+    } catch (error) {
+      setExecutionState('error')
+      console.error(error)
+    }
   }, [nodes, edges, runWorkflow])
 
   const handleNodesMove = useCallback((nodeIds: string[], updates: Record<string, WorkflowViewportPoint>) => {
@@ -377,6 +391,7 @@ export default function WorkflowPage() {
           edges={edges}
           selectedNodeIds={selectedNodeIds}
           connectionDraft={connectionDraft}
+          activeEdgeIds={activeEdgeIds}
           className={styles.canvas}
           viewportRef={viewportRef}
           onNodeClick={handleNodeClick}
@@ -411,6 +426,8 @@ export default function WorkflowPage() {
           node={inspectorNode}
           nodes={nodes}
           edges={edges}
+          nodeResults={nodeResults}
+          runningNodeId={runningNodeId}
           onClose={() => setSelectedNodeIds([])}
           onDelete={inspectorNode ? () => handleDeleteNode(inspectorNode.id) : undefined}
           onApply={inspectorNode ? (payload) => handleApplyConfig(inspectorNode.id, payload) : undefined}

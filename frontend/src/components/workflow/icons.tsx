@@ -159,3 +159,20 @@ export function RefreshCwIcon({ size = 18, className }: IconProps) {
     </svg>
   )
 }
+
+export function PlayIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+export function FlagIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+      <line x1="4" y1="22" x2="4" y2="15" />
+    </svg>
+  )
+}

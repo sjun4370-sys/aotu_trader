@@ -4,6 +4,7 @@ import { NODE_TYPE_ICONS } from './nodeIcons'
 import styles from './PaletteItemCard.module.css'
 
 const CATEGORY_COLORS: Record<string, string> = {
+  trigger: 'var(--wf-node-trigger)',
   currency: 'var(--wf-node-currency)',
   data: 'var(--wf-node-data)',
   strategy: 'var(--wf-node-strategy)',

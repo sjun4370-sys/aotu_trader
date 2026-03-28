@@ -4,11 +4,16 @@
   --wf-surface-strong: rgba(241, 245, 249, 0.95);
   --wf-text: #0f172a;
   --wf-muted: #65748a;
+  --wf-node-trigger: #22c55e;
   --wf-node-currency: #0ea5a9;
   --wf-node-data: #38bdf8;
   --wf-node-strategy: #a855f7;
   --wf-node-ai: #fb7185;
   --wf-node-tool: #f59e0b;
+  --wf-primary: #6366f1;
+  --wf-error: #ef4444;
+  --wf-success: #22c55e;
+  --wf-skipped: #94a3b8;
   --wf-radius-card: 28px;
   --wf-radius-panel: 18px;
   --wf-blur-md: 20px;

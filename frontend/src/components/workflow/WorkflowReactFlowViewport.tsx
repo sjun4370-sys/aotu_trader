@@ -27,6 +27,7 @@ interface WorkflowReactFlowViewportProps {
   edges: WorkflowEdge[]
   selectedNodeIds: string[]
   connectionDraft?: WorkflowConnectionDraft | null
+  activeEdgeIds?: Set<string>
   className?: string
   viewportRef?: MutableRefObject<HTMLElement | null>
   onNodeClick?: (nodeId: string, additive: boolean) => void
@@ -70,6 +71,131 @@ function NodeContent({ node }: { node: WorkflowNode }) {
   }
 }
 
+// 根据节点类型和配置获取副标题
+function getNodeSubtitle(node: WorkflowNode): string | undefined {
+  const { type, config } = node
+
+  switch (type) {
+    case 'market': {
+      const dataType = config.dataType as string
+      if (!dataType) return undefined
+      const DATA_TYPE_LABELS: Record<string, string> = {
+        kline: 'K线',
+        ticker: '实时行情',
+        trade: '成交历史',
+        depth: '订单簿',
+        info: '币对信息'
+      }
+      const label = DATA_TYPE_LABELS[dataType]
+      if (!label) return undefined
+
+      // 根据数据类型显示对应参数
+      if (dataType === 'kline') {
+        const interval = config.interval as string
+        return interval ? `${label} · ${interval}` : label
+      }
+      if (dataType === 'trade') {
+        const limit = config.tradeLimit as number
+        return limit ? `${label} · ${limit}条` : label
+      }
+      if (dataType === 'depth') {
+        const levels = config.depthLevels as number
+        return levels ? `${label} · ${levels}档` : label
+      }
+      return label
+    }
+    case 'indicator': {
+      const indicator = config.indicator as string
+      if (!indicator) return undefined
+      const INDICATOR_LABELS: Record<string, string> = {
+        rsi: 'RSI',
+        macd: 'MACD',
+        bollinger: '布林带',
+        ma: '均线',
+        kd: 'KD',
+        atr: 'ATR',
+        obv: 'OBV'
+      }
+      const label = INDICATOR_LABELS[indicator] || indicator?.toUpperCase()
+      if (!label) return undefined
+      // 显示参数
+      const params = config.indicatorParams as Record<string, number> | undefined
+      if (params && Object.keys(params).length > 0) {
+        const paramStr = Object.entries(params)
+          .map(([k, v]) => `${k}:${v}`)
+          .join(' · ')
+        return `${label} · ${paramStr}`
+      }
+      return label
+    }
+    case 'account': {
+      const accountType = config.account as string
+      if (!accountType) return undefined
+      const ACCOUNT_LABELS: Record<string, string> = {
+        main: '主账户',
+        quant: '量化账户',
+        test: '测试账户'
+      }
+      return ACCOUNT_LABELS[accountType] || accountType
+    }
+    case 'start': {
+      const triggerType = (config.triggerType as string) || 'manual'
+      const TRIGGER_LABELS: Record<string, string> = {
+        manual: '手动',
+        schedule: '定时',
+        event: '事件'
+      }
+      return TRIGGER_LABELS[triggerType] || '手动'
+    }
+    case 'strategy': {
+      const strategyType = config.strategyType as string
+      if (!strategyType) return undefined
+      return strategyType
+    }
+    case 'trade': {
+      const tradeType = config.tradeType as string
+      if (!tradeType) return undefined
+      const TRADE_TYPE_LABELS: Record<string, string> = {
+        buy: '买入',
+        sell: '卖出',
+        close: '平仓'
+      }
+      return TRADE_TYPE_LABELS[tradeType] || tradeType
+    }
+    case 'currency': {
+      const currencies = config.currencies as string[]
+      if (!currencies || currencies.length === 0) return undefined
+      return currencies.length === 1 ? currencies[0] : `${currencies.length}个币种`
+    }
+    case 'analysis': {
+      const model = config.model as string
+      if (!model) return undefined
+      return model
+    }
+    case 'condition': {
+      const expression = config.expression as string
+      if (!expression) return undefined
+      return expression
+    }
+    case 'loop': {
+      const loopMode = config.loopMode as string
+      if (!loopMode) return undefined
+      const LOOP_LABELS: Record<string, string> = {
+        times: '次数循环',
+        datasource: '数据源循环'
+      }
+      const label = LOOP_LABELS[loopMode] || loopMode
+      if (loopMode === 'times') {
+        const count = config.count as number
+        return count ? `${label} · ${count}次` : label
+      }
+      return label
+    }
+    default:
+      return undefined
+  }
+}
+
 function WorkflowReactFlowNodeComponent({ data, selected, dragging }: NodeProps<Node<WorkflowReactFlowNodeData>>) {
   const node = data.workflowNode
 
@@ -93,7 +219,9 @@ function WorkflowReactFlowNodeComponent({ data, selected, dragging }: NodeProps<
     >
       <WorkflowNodeCard
         title={node.label}
+        subtitle={getNodeSubtitle(node)}
         category={node.category}
+        nodeType={node.type}
         status={node.status}
         selected={selected}
         dragging={dragging}
@@ -149,6 +277,7 @@ export default function WorkflowReactFlowViewport({
   edges,
   selectedNodeIds,
   connectionDraft,
+  activeEdgeIds,
   className,
   viewportRef,
   onNodeClick,
@@ -409,6 +538,7 @@ export default function WorkflowReactFlowViewport({
           selectedNodeIds={selectedNodeIds}
           connectionDraft={connectionDraft}
           draggingNodeIds={draggingNodeIds}
+          activeEdgeIds={activeEdgeIds}
         />
       </div>
     </div>

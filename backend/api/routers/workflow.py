@@ -1,16 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 from sqlalchemy.orm import Session
-from backend.api.schemas.workflow import (
+from api.schemas.workflow import (
     WorkflowCreateRequest,
     WorkflowUpdateRequest,
     WorkflowResponse,
     WorkflowListResponse,
 )
-from backend.services.workflow_service import WorkflowService
-from backend.database.session import get_db
+from services.workflow_service import WorkflowService
+from database.session import get_db
 
-router = APIRouter(prefix="/api/workflow", tags=["workflow"])
+router = APIRouter(tags=["workflow"])
 
 
 @router.post("/save", response_model=WorkflowResponse)
@@ -32,6 +32,25 @@ async def save_workflow(request: WorkflowCreateRequest, db: Session = Depends(ge
 async def get_workflow(workflow_id: str, db: Session = Depends(get_db)):
     service = WorkflowService(db)
     workflow = service.get_workflow(workflow_id)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    return WorkflowResponse(
+        id=workflow.id,
+        name=workflow.name,
+        description=workflow.description,
+        nodes=workflow.nodes,
+        edges=workflow.edges,
+        created_at=workflow.created_at,
+        updated_at=workflow.updated_at,
+    )
+
+
+@router.put("/{workflow_id}", response_model=WorkflowResponse)
+async def update_workflow(
+    workflow_id: str, request: WorkflowUpdateRequest, db: Session = Depends(get_db)
+):
+    service = WorkflowService(db)
+    workflow = service.update_workflow(workflow_id, request)
     if not workflow:
         raise HTTPException(status_code=404, detail="Workflow not found")
     return WorkflowResponse(

@@ -10,6 +10,7 @@
   overflow: visible;
 }
 
+.card[data-category='trigger']  { --node-accent: var(--wf-node-trigger); }
 .card[data-category='currency'] { --node-accent: var(--wf-node-currency); }
 .card[data-category='data']     { --node-accent: var(--wf-node-data); }
 .card[data-category='strategy'] { --node-accent: var(--wf-node-strategy); }
@@ -56,6 +57,17 @@
   flex-direction: column;
   gap: 4px;
   margin-bottom: 12px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon {
+  color: var(--node-accent, var(--wf-muted));
+  flex-shrink: 0;
 }
 
 .title {
@@ -128,16 +140,30 @@
 }
 
 .nodeRunning {
-  box-shadow: 0 0 0 2px var(--color-primary, #6366f1), 0 0 20px var(--color-primary, #6366f1);
+  box-shadow: 0 0 0 2px var(--wf-primary), 0 0 20px var(--wf-primary);
   animation: pulse 1s infinite;
 }
 
 .nodeError {
-  box-shadow: 0 0 0 2px var(--color-error, #ef4444), 0 0 20px var(--color-error, #ef4444);
+  box-shadow: 0 0 0 2px var(--wf-error), 0 0 20px var(--wf-error);
 }
 
 .nodeSuccess {
-  box-shadow: 0 0 0 2px var(--color-success, #22c55e);
+  box-shadow: 0 0 0 2px var(--wf-success);
+}
+
+.nodeSkipped {
+  --node-accent: var(--wf-skipped);
+  background: color-mix(in srgb, var(--wf-surface) 70%, var(--wf-skipped) 30%);
+  border-color: color-mix(in srgb, var(--wf-skipped) 45%, transparent);
+  box-shadow: 0 10px 18px color-mix(in srgb, var(--wf-skipped) 20%, transparent);
+}
+
+.nodeSkipped .accentBar,
+.nodeSkipped .title,
+.nodeSkipped .subtitle,
+.nodeSkipped .body {
+  opacity: 0.6;
 }
 
 @keyframes pulse {

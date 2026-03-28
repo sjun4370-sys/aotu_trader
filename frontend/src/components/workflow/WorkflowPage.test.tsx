@@ -106,15 +106,15 @@ describe('WorkflowPage', () => {
     expect(screen.queryByTestId('node-quick-popover')).not.toBeInTheDocument()
     expect(screen.getByTestId('node-inspector-panel')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('combobox'))
-    fireEvent.click(screen.getByRole('option', { name: '停用' }))
+    fireEvent.click(screen.getByRole('button', { name: '启用' }))
+    fireEvent.click(screen.getByRole('button', { name: '停用' }))
     fireEvent.change(screen.getByRole('textbox'), {
       target: { value: '{"interval":"1m"}' }
     })
     fireEvent.click(screen.getByRole('button', { name: '应用' }))
 
     fireEvent.click(node)
-    expect(screen.getByRole('combobox')).toHaveTextContent('停用')
+    expect(screen.getByRole('button', { name: '停用' })).toBeInTheDocument()
     expect(node).toHaveTextContent('1m')
     expect(node).toHaveAttribute('data-node-status', 'disabled')
   })

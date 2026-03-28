@@ -4,6 +4,7 @@ import { getPortPoint } from '../../utils/workflow'
 import styles from './EdgeLayer.module.css'
 
 const CATEGORY_COLORS: Record<WorkflowNodeCategory, string> = {
+  trigger: '#22c55e',
   currency: '#0ea5a9',
   data: '#38bdf8',
   strategy: '#a855f7',
@@ -17,6 +18,7 @@ interface EdgeLayerProps {
   selectedNodeIds: string[]
   connectionDraft?: WorkflowConnectionDraft | null
   draggingNodeIds?: string[]
+  activeEdgeIds?: Set<string>
 }
 
 interface PortPosition {
@@ -42,6 +44,7 @@ interface ResolvedEdgePath {
   toColor: string
   isConnectedToSelection: boolean
   isDisabled: boolean
+  isActive?: boolean
 }
 
 function EdgePath({
@@ -60,7 +63,9 @@ function EdgePath({
   const [hovered, setHovered] = useState(false)
 
   let visualState: 'default' | 'active' | 'dimmed' = 'default'
-  if (!preview && selectedNodeIds.length > 0) {
+  if (path.isActive) {
+    visualState = 'active'
+  } else if (!preview && selectedNodeIds.length > 0) {
     visualState = path.isConnectedToSelection ? 'active' : 'dimmed'
   }
 
@@ -139,7 +144,8 @@ export default function EdgeLayer({
   nodes,
   selectedNodeIds,
   connectionDraft = null,
-  draggingNodeIds = []
+  draggingNodeIds = [],
+  activeEdgeIds
 }: EdgeLayerProps) {
   const isDragging = draggingNodeIds.length > 0
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes])
@@ -160,6 +166,7 @@ export default function EdgeLayer({
       }
 
       const isDisabled = fromNode.status === 'disabled' || toNode.status === 'disabled'
+      const isActive = activeEdgeIds?.has(edge.id) ?? false
 
       return [{
         edge,
@@ -169,10 +176,11 @@ export default function EdgeLayer({
         toColor: isDisabled ? '#cbd5e1' : CATEGORY_COLORS[toNode.category],
         isConnectedToSelection:
           selectedNodeIdSet.has(edge.fromNodeId) || selectedNodeIdSet.has(edge.toNodeId),
-        isDisabled
+        isDisabled,
+        isActive
       } satisfies ResolvedEdgePath]
     })
-  }, [edges, nodeById, selectedNodeIdSet])
+  }, [edges, nodeById, selectedNodeIdSet, activeEdgeIds])
 
   const draftPath = useMemo(() => {
     if (!connectionDraft) {

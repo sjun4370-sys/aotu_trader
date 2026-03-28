@@ -23,7 +23,7 @@ const CURRENCY_NODE: WorkflowNodeTemplate = {
   type: 'currency',
   category: 'currency',
   label: '币种选择器',
-  inputs: [],
+  inputs: [createPort('trigger', '触发', 'input')],
   outputs: [createPort('out', '币种', 'output')]
 }
 
@@ -39,7 +39,7 @@ const ACCOUNT_NODE: WorkflowNodeTemplate = {
   type: 'account',
   category: 'data',
   label: '获取账户数据',
-  inputs: [],
+  inputs: [createPort('trigger', '触发', 'input')],
   outputs: [createPort('accountData', '账户数据', 'output')]
 }
 
@@ -95,6 +95,7 @@ const LOOP_NODE: WorkflowNodeTemplate = {
 }
 
 export const WORKFLOW_NODE_TEMPLATES: WorkflowNodeTemplate[] = [
+  START_NODE,
   CURRENCY_NODE,
   MARKET_NODE,
   ACCOUNT_NODE,

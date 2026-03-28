@@ -1,13 +1,15 @@
 import type { ReactNode } from 'react'
 import type { CSSProperties, MouseEvent, PointerEvent as ReactPointerEvent } from 'react'
-import type { WorkflowNodeCategory, WorkflowNodeStatus, WorkflowPort } from '../../types/workflow'
+import type { WorkflowNodeCategory, WorkflowNodeStatus, WorkflowNodeType, WorkflowPort } from '../../types/workflow'
 import { getPortOffset } from '../../utils/workflow'
+import { NODE_TYPE_ICONS } from './nodeIcons'
 import styles from './WorkflowNodeCard.module.css'
 
 interface WorkflowNodeCardProps {
   title: string
   subtitle?: string
   category?: WorkflowNodeCategory
+  nodeType?: WorkflowNodeType
   status?: WorkflowNodeStatus
   selected?: boolean
   dragging?: boolean
@@ -82,6 +84,7 @@ export default function WorkflowNodeCard({
   title,
   subtitle,
   category,
+  nodeType,
   status = 'enabled',
   selected = false,
   dragging = false,
@@ -99,6 +102,8 @@ export default function WorkflowNodeCard({
 }: WorkflowNodeCardProps) {
   const executionClass = executionStatus && executionStatus !== 'idle' ? styles[`node${executionStatus.charAt(0).toUpperCase() + executionStatus.slice(1)}`] : ''
   const cardClass = [styles.card, executionClass, className].filter(Boolean).join(' ')
+
+  const IconComponent = nodeType ? NODE_TYPE_ICONS[nodeType] : null
 
   return (
     <article
@@ -135,7 +140,10 @@ export default function WorkflowNodeCard({
       )}
       <div className={styles.accentBar} />
       <header className={styles.header}>
-        <p className={styles.title}>{title}</p>
+        <div className={styles.titleRow}>
+          {IconComponent && <IconComponent size={18} className={styles.icon} />}
+          <p className={styles.title}>{title}</p>
+        </div>
         {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
       </header>
       <div className={styles.body}>{children}</div>

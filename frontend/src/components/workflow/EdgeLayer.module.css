@@ -48,11 +48,11 @@
 }
 
 .edgeActive {
-  stroke: var(--color-primary, #6366f1);
+  stroke: var(--wf-primary);
   stroke-width: 3;
 }
 
 .edgeError {
-  stroke: var(--color-error, #ef4444);
+  stroke: var(--wf-error);
   stroke-width: 3;
 }
