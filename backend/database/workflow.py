@@ -12,6 +12,10 @@ class Workflow(Base):
     nodes = Column(JSON, nullable=False)
     edges = Column(JSON, nullable=False)
     user_id = Column(String(64), nullable=True, index=True)
+    # 新增字段
+    status = Column(String(20), default="idle", nullable=False)  # idle, running
+    last_run_at = Column(DateTime, nullable=True)
+    trigger_mode = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime,

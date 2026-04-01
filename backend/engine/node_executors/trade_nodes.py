@@ -1,0 +1,307 @@
+"""
+交易执行节点 - 真实下单到OKX
+"""
+
+import logging
+import time
+from typing import Any, Dict, Optional
+from decimal import Decimal
+
+from engine.workflow_engine import ExecutionContext
+from okx_api.trade import TradeAPI
+from okx_api.account import AccountAPI
+from okx_api.config import OKXConfig
+
+logger = logging.getLogger(__name__)
+
+# 交易API实例
+trade_api: Optional[TradeAPI] = None
+account_api: Optional[AccountAPI] = None
+
+
+def init_trade_api(config: OKXConfig):
+    """初始化交易API"""
+    global trade_api, account_api
+    trade_api = TradeAPI(config=config)
+    account_api = AccountAPI(config=config)
+    logger.info("交易API已初始化")
+
+
+async def execute_create_order(node: Dict, context: ExecutionContext) -> Any:
+    """
+    创建订单节点 - 真实下单到OKX
+    """
+    if not trade_api:
+        raise RuntimeError("交易API未初始化")
+
+    config = node.get("config", {})
+
+    # 获取订单参数
+    inst_id = config.get("inst_id", "BTC-USDT")
+    side = config.get("side", "buy")  # buy / sell
+    ord_type = config.get("ord_type", "market")  # market / limit
+    sz = config.get("sz", "0")  # 数量
+    px = config.get("px")  # 价格（限价单）
+
+    # 自动检测现货或合约
+    td_mode = _detect_trade_mode(inst_id)
+    pos_side = _detect_position_side(inst_id, side)
+
+    # 生成客户端订单ID
+    cl_ord_id = f"wf_{int(time.time() * 1000)}_{context.execution_id[:8]}"
+
+    logger.info(f"[Trade] 创建订单: {inst_id} {side} {ord_type} {sz}")
+
+    try:
+        # 调用OKX API下单
+        if ord_type == "market":
+            result = trade_api.place_market_order(
+                instId=inst_id, tdMode=td_mode, side=side, sz=str(sz), posSide=pos_side
+            )
+        else:  # limit
+            if not px:
+                raise ValueError("限价单必须指定价格")
+            result = trade_api.place_limit_order(
+                instId=inst_id,
+                tdMode=td_mode,
+                side=side,
+                px=str(px),
+                sz=str(sz),
+                posSide=pos_side,
+            )
+
+        # 解析响应
+        success, data = trade_api.parse_response(result)
+
+        if success and data:
+            order_info = data[0]
+            output = {
+                "success": True,
+                "order_id": order_info.get("ordId"),
+                "client_order_id": cl_ord_id,
+                "inst_id": inst_id,
+                "side": side,
+                "ord_type": ord_type,
+                "sz": sz,
+                "px": px,
+                "state": order_info.get("state"),  # live / partially_filled / filled
+                "msg": "订单创建成功",
+            }
+
+            # 保存到上下文
+            context.variables["last_order"] = output
+            context.variables[f"order_{inst_id}"] = output
+
+            logger.info(f"[Trade] 订单创建成功: {output['order_id']}")
+            return output
+        else:
+            raise Exception(f"下单失败: {data}")
+
+    except Exception as e:
+        logger.error(f"[Trade] 下单失败: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "inst_id": inst_id,
+            "side": side,
+            "sz": sz,
+        }
+
+
+def _detect_trade_mode(inst_id: str) -> str:
+    """检测交易模式"""
+    if "-SWAP" in inst_id or "-USD" in inst_id:
+        return "cross"  # 合约使用全仓模式
+    return "cash"  # 现货
+
+
+def _detect_position_side(inst_id: str, side: str) -> Optional[str]:
+    """检测持仓方向（合约需要）"""
+    if "-SWAP" in inst_id:
+        return "long" if side == "buy" else "short"
+    return None  # 现货不需要
+
+
+async def execute_monitor_order(node: Dict, context: ExecutionContext) -> Any:
+    """
+    监控订单节点 - 轮询订单状态直到成交或超时
+    """
+    if not trade_api:
+        raise RuntimeError("交易API未初始化")
+
+    config = node.get("config", {})
+
+    # 获取订单信息
+    order = context.variables.get("last_order", {})
+    inst_id = config.get("inst_id") or order.get("inst_id")
+    order_id = config.get("order_id") or order.get("order_id")
+
+    if not order_id:
+        raise ValueError("未找到订单ID")
+
+    timeout = config.get("timeout", 60)  # 默认60秒超时
+    poll_interval = config.get("poll_interval", 2)  # 轮询间隔2秒
+
+    logger.info(f"[Trade] 监控订单: {order_id} (超时: {timeout}s)")
+
+    start_time = time.time()
+    filled_qty = Decimal("0")
+    fill_price = None
+
+    try:
+        while time.time() - start_time < timeout:
+            # 查询订单状态
+            result = trade_api.get_order(inst_id, order_id)
+            success, data = trade_api.parse_response(result)
+
+            if not success or not data:
+                logger.warning(f"查询订单失败: {data}")
+                await asyncio.sleep(poll_interval)
+                continue
+
+            order_info = data[0]
+            state = order_info.get("state")
+            filled_sz = Decimal(order_info.get("accFillSz", "0"))
+            avg_px = order_info.get("avgPx")
+
+            logger.debug(f"[Trade] 订单状态: {state}, 已成交: {filled_sz}")
+
+            # 检查状态
+            if state == "filled":
+                fill_price = Decimal(avg_px) if avg_px else None
+                filled_qty = filled_sz
+                logger.info(f"[Trade] 订单完全成交: {order_id}, 均价: {fill_price}")
+                break
+            elif state == "partially_filled":
+                filled_qty = filled_sz
+                fill_price = Decimal(avg_px) if avg_px else None
+                # 部分成交，继续等待
+            elif state in ["canceled", "failed"]:
+                logger.warning(f"[Trade] 订单被取消或失败: {state}")
+                return {
+                    "success": False,
+                    "order_id": order_id,
+                    "state": state,
+                    "filled_qty": str(filled_qty),
+                    "reason": f"订单{state}",
+                }
+
+            await asyncio.sleep(poll_interval)
+
+        # 超时处理
+        if filled_qty > 0:
+            return {
+                "success": True,
+                "order_id": order_id,
+                "state": "partially_filled" if state != "filled" else "filled",
+                "filled_qty": str(filled_qty),
+                "fill_price": str(fill_price) if fill_price else None,
+                "note": "订单部分成交或超时" if state != "filled" else "订单完全成交",
+            }
+        else:
+            # 未成交，尝试取消
+            try:
+                trade_api.cancel_order(inst_id, order_id)
+            except:
+                pass
+
+            return {
+                "success": False,
+                "order_id": order_id,
+                "state": "timeout",
+                "filled_qty": "0",
+                "reason": "超时未成交，已取消",
+            }
+
+    except Exception as e:
+        logger.error(f"[Trade] 监控订单失败: {e}")
+        return {"success": False, "order_id": order_id, "error": str(e)}
+
+
+async def execute_cancel_order(node: Dict, context: ExecutionContext) -> Any:
+    """
+    取消订单节点
+    """
+    if not trade_api:
+        raise RuntimeError("交易API未初始化")
+
+    config = node.get("config", {})
+
+    order = context.variables.get("last_order", {})
+    inst_id = config.get("inst_id") or order.get("inst_id")
+    order_id = config.get("order_id") or order.get("order_id")
+
+    if not order_id:
+        raise ValueError("未找到订单ID")
+
+    logger.info(f"[Trade] 取消订单: {order_id}")
+
+    try:
+        result = trade_api.cancel_order(inst_id, order_id)
+        success, data = trade_api.parse_response(result)
+
+        if success:
+            logger.info(f"[Trade] 订单取消成功: {order_id}")
+            return {"success": True, "order_id": order_id, "msg": "订单已取消"}
+        else:
+            return {"success": False, "order_id": order_id, "error": str(data)}
+
+    except Exception as e:
+        logger.error(f"[Trade] 取消订单失败: {e}")
+        return {"success": False, "order_id": order_id, "error": str(e)}
+
+
+async def execute_query_position(node: Dict, context: ExecutionContext) -> Any:
+    """
+    查询持仓节点
+    """
+    if not account_api:
+        raise RuntimeError("账户API未初始化")
+
+    config = node.get("config", {})
+    inst_id = config.get("inst_id")
+
+    logger.info(f"[Trade] 查询持仓" + (f" ({inst_id})" if inst_id else ""))
+
+    try:
+        result = account_api.get_positions(instId=inst_id)
+        success, data = account_api.parse_response(result)
+
+        if success:
+            positions = []
+            total_pnl = Decimal("0")
+
+            for pos in data:
+                position = {
+                    "inst_id": pos.get("instId"),
+                    "pos_side": pos.get("posSide"),
+                    "pos": pos.get("pos"),
+                    "avg_px": pos.get("avgPx"),
+                    "mark_px": pos.get("markPx"),
+                    "upl": pos.get("upl"),
+                    "upl_ratio": pos.get("uplRatio"),
+                    "margin": pos.get("margin"),
+                    "lever": pos.get("lever"),
+                }
+                positions.append(position)
+                if pos.get("upl"):
+                    total_pnl += Decimal(pos["upl"])
+
+            output = {
+                "success": True,
+                "positions": positions,
+                "count": len(positions),
+                "total_upl": str(total_pnl),
+            }
+
+            context.variables["positions"] = output
+            logger.info(
+                f"[Trade] 持仓查询完成: {len(positions)}个持仓, 总盈亏: {total_pnl}"
+            )
+            return output
+        else:
+            return {"success": False, "error": str(data)}
+
+    except Exception as e:
+        logger.error(f"[Trade] 查询持仓失败: {e}")
+        return {"success": False, "error": str(e)}
