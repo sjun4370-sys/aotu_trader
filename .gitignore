@@ -83,3 +83,5 @@ coverage/
 
 # Temp files
 *.tmp
+.sisyphus
+.worktrees/*
