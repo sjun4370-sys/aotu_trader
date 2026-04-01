@@ -51,7 +51,7 @@ export async function getWorkflows(
   if (params?.search) searchParams.set('search', params.search)
 
   const query = searchParams.toString()
-  return request<WorkflowListResponse>(`/workflow?${query}`)
+  return request<WorkflowListResponse>(`/workflow/?${query}`)
 }
 
 /**

@@ -3,7 +3,7 @@
  * 使用现代深色主题设计
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { 
   WorkflowListItem, 
@@ -208,6 +208,12 @@ export default function WorkflowListPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [total, setTotal] = useState(0)
+
+  // 用 ref 追踪最新的 workflows，避免闭包问题
+  const workflowsRef = useRef(workflows)
+  useEffect(() => {
+    workflowsRef.current = workflows
+  }, [workflows])
   
   // 筛选和分页状态
   const [page, setPage] = useState(1)
@@ -245,17 +251,17 @@ export default function WorkflowListPage() {
   // 初始加载和自动刷新
   useEffect(() => {
     loadWorkflows()
-    
+
     // 每 5 秒刷新一次运行中的工作流状态
     const interval = setInterval(() => {
-      const hasRunning = workflows.some(w => w.status === 'running')
+      const hasRunning = workflowsRef.current.some(w => w.status === 'running')
       if (hasRunning) {
         loadWorkflows()
       }
     }, 5000)
-    
+
     return () => clearInterval(interval)
-  }, [loadWorkflows, workflows])
+  }, [loadWorkflows])
   
   // 运行工作流
   const handleRun = async (id: string) => {
