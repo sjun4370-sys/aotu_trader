@@ -32,7 +32,7 @@ export default function MarketDataViewer({ data, isInferred }: Props) {
           </div>
           <div className={styles.infoItem}>
             <span className={styles.infoLabel}>K线数量</span>
-            <span className={styles.infoValue}>{data.count || 0} 根</span>
+            <span className={styles.infoValue}>{String(data.count || 0)} 根</span>
           </div>
           <div className={styles.infoItem}>
             <span className={styles.infoLabel}>交易对</span>
@@ -145,7 +145,7 @@ export default function MarketDataViewer({ data, isInferred }: Props) {
           </div>
           <div className={styles.infoItem}>
             <span className={styles.infoLabel}>数量限制</span>
-            <span className={styles.infoValue}>{data.limit || 50} 条/币种</span>
+            <span className={styles.infoValue}>{String(data.limit || 50)} 条/币种</span>
           </div>
         </div>
 
@@ -200,7 +200,7 @@ export default function MarketDataViewer({ data, isInferred }: Props) {
           </div>
           <div className={styles.infoItem}>
             <span className={styles.infoLabel}>深度级别</span>
-            <span className={styles.infoValue}>{data.levels || 20} 层</span>
+            <span className={styles.infoValue}>{String(data.levels || 20)} 层</span>
           </div>
         </div>
 
@@ -281,8 +281,8 @@ export default function MarketDataViewer({ data, isInferred }: Props) {
                         {String(info.status || '-')}
                       </span>
                     </td>
-                    <td>{info.pricePrecision}</td>
-                    <td>{info.qtyPrecision}</td>
+                    <td>{String(info.pricePrecision ?? '-')}</td>
+                    <td>{String(info.qtyPrecision ?? '-')}</td>
                     <td>{String(info.minQty || '-')}</td>
                   </tr>
                 ))}

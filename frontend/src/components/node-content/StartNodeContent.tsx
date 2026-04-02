@@ -1,8 +1,7 @@
-import type { WorkflowNode } from '../../types/workflow'
 import styles from './NodeContent.shared.module.css'
 
-interface Props { node: WorkflowNode }
+interface Props { node: import('../../types/workflow').WorkflowNode }
 
-export default function StartNodeContent({ node }: Props) {
+export default function StartNodeContent({ node: _node }: Props) {
   return <div className={styles.container} />
 }

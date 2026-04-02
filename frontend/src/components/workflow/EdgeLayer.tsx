@@ -7,9 +7,13 @@ const CATEGORY_COLORS: Record<WorkflowNodeCategory, string> = {
   trigger: '#22c55e',
   currency: '#0ea5a9',
   data: '#38bdf8',
+  indicator: '#0ea5e9',
   strategy: '#a855f7',
   ai: '#fb7185',
-  tool: '#f59e0b'
+  tool: '#f59e0b',
+  risk: '#f59e0b',
+  logic: '#a855f7',
+  trade: '#10b981'
 }
 
 interface EdgeLayerProps {

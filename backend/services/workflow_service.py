@@ -4,13 +4,14 @@
 
 from __future__ import annotations
 import uuid
-import asyncio
 from datetime import datetime, timezone
 from typing import List, Optional, TYPE_CHECKING
 from sqlalchemy.orm import Session
 from database.workflow import Workflow
-from engine.workflow_engine import workflow_engine, ExecutionContext
+from engine.workflow_engine import workflow_engine
+from engine.context import ExecutionContext
 from engine.task_scheduler import task_scheduler
+from config.system_config import system_config
 
 if TYPE_CHECKING:
     from api.schemas.workflow import WorkflowCreateRequest, WorkflowUpdateRequest
@@ -130,6 +131,13 @@ class WorkflowService:
         # 检查是否已经在运行
         if workflow.status == "running":
             return workflow
+
+        # 初始化 API（如果需要）
+        if system_config.is_configured():
+            workflow_engine.initialize_apis(
+                okx_config=system_config.to_okx_config(),
+                llm_config={"api_key": system_config.anthropic_api_key} if system_config.has_llm_config() else None
+            )
 
         # 更新状态为运行中
         workflow.status = "running"

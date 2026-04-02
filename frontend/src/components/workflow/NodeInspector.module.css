@@ -1,25 +1,20 @@
 .panel {
-  width: 380px;
-  min-height: 500px;
-  max-height: calc(100vh - 32px);
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--wf-surface);
-  backdrop-filter: blur(var(--wf-blur-md));
-  -webkit-backdrop-filter: blur(var(--wf-blur-md));
-  border-radius: var(--wf-radius-panel);
-  border: 1px solid color-mix(in srgb, var(--wf-text) 8%, transparent);
-  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.15);
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.1);
   overflow: hidden;
   transform: translateX(0);
   transition: width 320ms cubic-bezier(0.4, 0, 0.2, 1),
-              opacity var(--wf-duration-medium) ease,
-              transform var(--wf-duration-medium) ease;
+              opacity 0.25s ease,
+              transform 0.25s ease;
   opacity: 1;
   pointer-events: auto;
-  resize: horizontal;
-  resize: both;
-  overflow: auto;
 }
 
 .panel[data-visible='false'] {
@@ -43,11 +38,11 @@
   cursor: ew-resize;
   z-index: 10;
   background: transparent;
-  transition: background var(--wf-duration-fast) ease;
+  transition: background 0.15s ease;
 }
 
 .panel::before:hover {
-  background: color-mix(in srgb, var(--wf-text) 15%, transparent);
+  background: #cbd5e1;
 }
 
 .header {
@@ -56,9 +51,9 @@
   justify-content: space-between;
   gap: 12px;
   padding: 14px 16px;
-  border-bottom: 1px solid color-mix(in srgb, var(--wf-text) 6%, transparent);
+  border-bottom: 1px solid #e2e8f0;
   flex-shrink: 0;
-  background: color-mix(in srgb, var(--wf-text) 2%, transparent);
+  background: #f8fafc;
 }
 
 .headerMain {
@@ -72,7 +67,7 @@
 .title {
   font-size: 0.88rem;
   font-weight: 700;
-  color: var(--wf-text);
+  color: #0f172a;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -89,29 +84,33 @@
 }
 
 .categoryBadge[data-category='trigger'] {
-  background: color-mix(in srgb, var(--wf-node-trigger) 15%, transparent);
-  color: var(--wf-node-trigger);
+  background: #dbeafe;
+  color: #2563eb;
 }
 
 .categoryBadge[data-category='currency'] {
-  background: color-mix(in srgb, var(--wf-node-currency) 15%, transparent);
-  color: var(--wf-node-currency);
+  background: #dcfce7;
+  color: #16a34a;
 }
+
 .categoryBadge[data-category='data'] {
-  background: color-mix(in srgb, var(--wf-node-data) 15%, transparent);
-  color: var(--wf-node-data);
+  background: #f1f5f9;
+  color: #475569;
 }
+
 .categoryBadge[data-category='strategy'] {
-  background: color-mix(in srgb, var(--wf-node-strategy) 15%, transparent);
-  color: var(--wf-node-strategy);
+  background: #fef3c7;
+  color: #d97706;
 }
+
 .categoryBadge[data-category='ai'] {
-  background: color-mix(in srgb, var(--wf-node-ai) 15%, transparent);
-  color: var(--wf-node-ai);
+  background: #f3e8ff;
+  color: #9333ea;
 }
+
 .categoryBadge[data-category='tool'] {
-  background: color-mix(in srgb, var(--wf-node-tool) 15%, transparent);
-  color: var(--wf-node-tool);
+  background: #fce7f3;
+  color: #db2777;
 }
 
 .closeBtn {
@@ -120,7 +119,7 @@
   border-radius: 8px;
   border: none;
   background: transparent;
-  color: var(--wf-muted);
+  color: #64748b;
   font-size: 1.1rem;
   line-height: 1;
   cursor: pointer;
@@ -129,12 +128,12 @@
   justify-content: center;
   padding: 0;
   flex-shrink: 0;
-  transition: background var(--wf-duration-fast) ease, color var(--wf-duration-fast) ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .closeBtn:hover {
-  background: color-mix(in srgb, var(--wf-text) 10%, transparent);
-  color: var(--wf-text);
+  background: #e2e8f0;
+  color: #0f172a;
 }
 
 /* Body - vertical stack with gap */
@@ -146,7 +145,7 @@
   gap: 12px;
   padding: 12px;
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--wf-text) 15%, transparent) transparent;
+  scrollbar-color: #cbd5e1 transparent;
 }
 
 .body::-webkit-scrollbar {
@@ -158,14 +157,14 @@
 }
 
 .body::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--wf-text) 15%, transparent);
+  background: #cbd5e1;
   border-radius: 4px;
 }
 
 /* Each section is a card */
 .section {
-  background: var(--wf-surface-strong);
-  border: 1px solid color-mix(in srgb, var(--wf-text) 6%, transparent);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 12px;
   display: flex;
@@ -179,7 +178,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--wf-muted);
+  color: #64748b;
 }
 
 /* Basic Info - simple inline row */
@@ -193,13 +192,13 @@
 
 .infoLabel {
   font-size: 0.78rem;
-  color: var(--wf-muted);
+  color: #64748b;
   white-space: nowrap;
 }
 
 .infoValue {
   font-size: 0.8rem;
-  color: var(--wf-text);
+  color: #0f172a;
   margin: 0;
 }
 
@@ -216,7 +215,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--wf-muted);
+  color: #64748b;
 }
 
 .portRow {
@@ -224,19 +223,19 @@
   align-items: center;
   gap: 8px;
   padding: 7px 10px;
-  background: var(--wf-surface);
+  background: #ffffff;
   border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--wf-text) 5%, transparent);
-  transition: border-color var(--wf-duration-fast) ease;
+  border: 1px solid #e2e8f0;
+  transition: border-color 0.15s ease;
 }
 
 .portRow:hover {
-  border-color: color-mix(in srgb, var(--wf-text) 12%, transparent);
+  border-color: #cbd5e1;
 }
 
 .portSources {
   font-size: 0.68rem;
-  color: var(--wf-muted);
+  color: #94a3b8;
   margin-left: auto;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -247,7 +246,7 @@
 .portName {
   font-size: 0.8rem;
   font-weight: 500;
-  color: var(--wf-text);
+  color: #0f172a;
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -266,19 +265,19 @@
 }
 
 .portBadge[data-direction='input'] {
-  background: color-mix(in srgb, var(--wf-node-data) 12%, transparent);
-  color: var(--wf-node-data);
+  background: #dbeafe;
+  color: #2563eb;
 }
 
 .portBadge[data-direction='output'] {
-  background: color-mix(in srgb, var(--wf-node-strategy) 12%, transparent);
-  color: var(--wf-node-strategy);
+  background: #fef3c7;
+  color: #d97706;
 }
 
 .emptyPorts {
   margin: 0;
   font-size: 0.75rem;
-  color: var(--wf-muted);
+  color: #94a3b8;
   font-style: italic;
 }
 
@@ -286,9 +285,9 @@
 .emptyText {
   margin: 0;
   font-size: 0.75rem;
-  color: var(--wf-muted);
+  color: #94a3b8;
   padding: 10px;
-  background: var(--wf-surface);
+  background: #ffffff;
   border-radius: 8px;
   text-align: center;
 }
@@ -296,9 +295,9 @@
 .inferredHint {
   margin: 0;
   font-size: 0.7rem;
-  color: var(--wf-muted);
+  color: #64748b;
   padding: 7px 10px;
-  background: color-mix(in srgb, var(--wf-primary) 8%, transparent);
+  background: #eff6ff;
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -309,20 +308,6 @@
   font-size: 0.8rem;
 }
 
-.dataSource {
-  font-size: 0.6rem;
-  font-weight: 700;
-  padding: 2px 5px;
-  border-radius: 4px;
-  text-transform: uppercase;
-  background: color-mix(in srgb, var(--wf-muted) 15%, transparent);
-  color: var(--wf-muted);
-}
-
-.dataSource[data-source='real'] {
-  background: color-mix(in srgb, var(--wf-success) 15%, transparent);
-  color: var(--wf-success);
-}
 
 .viewerWrapper {
   display: flex;
@@ -345,30 +330,131 @@
 .sourceName {
   font-size: 0.68rem;
   font-weight: 700;
-  color: var(--wf-text);
+  color: #0f172a;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+/* 输入端口卡片样式 */
+.inputPortCard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.inputPortCard:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.inputPortHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.inputPortInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.inputPortLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sourceNodeTag {
+  font-size: 0.7rem;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.sourceNodeTag[data-empty="true"] {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.sourceNodeId {
+  font-size: 0.65rem;
+  color: #94a3b8;
+  font-family: 'Fira Mono', 'Consolas', 'Menlo', monospace;
+}
+
+/* 数据来源状态标签 */
+.dataSourceBadge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+/* 推断数据 - 灰色/中性 */
+.dataSourceBadge[data-inferred="true"] {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+/* 实际数据 - 绿色/成功 */
+.dataSourceBadge[data-real="true"] {
+  background: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+/* 空端口数据提示 */
+.emptyPortData {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 8px;
+  text-align: center;
+  font-style: italic;
 }
 
 .statusText {
   margin: 0;
   font-size: 0.75rem;
-  color: var(--wf-muted);
+  color: #64748b;
   padding: 10px;
-  background: var(--wf-surface);
+  background: #ffffff;
   border-radius: 8px;
   text-align: center;
 }
 
 .statusText[data-status='running'] {
-  color: var(--wf-primary);
+  color: #3b82f6;
   animation: pulse 1.5s ease-in-out infinite;
 }
 
 .errorBox {
   padding: 10px;
-  background: color-mix(in srgb, var(--wf-error) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--wf-error) 25%, transparent);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -379,12 +465,12 @@
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: var(--wf-error);
+  color: #dc2626;
 }
 
 .errorMsg {
   font-size: 0.75rem;
-  color: var(--wf-error);
+  color: #dc2626;
   word-break: break-word;
 }
 
@@ -417,26 +503,26 @@
   align-items: center;
   gap: 7px;
   padding: 6px 12px;
-  background: var(--wf-surface);
-  border: 1px solid color-mix(in srgb, var(--wf-text) 10%, transparent);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   cursor: pointer;
-  transition: all var(--wf-duration-fast) ease;
+  transition: all 0.15s ease;
   font-size: 0.8rem;
-  color: var(--wf-text);
+  color: #0f172a;
   font-weight: 500;
   white-space: nowrap;
 }
 
 .triggerSelectBtn:hover {
-  background: color-mix(in srgb, var(--wf-text) 5%, var(--wf-surface));
-  border-color: color-mix(in srgb, var(--wf-text) 18%, transparent);
+  background: #f8fafc;
+  border-color: #cbd5e1;
 }
 
 .triggerSelectBtn:focus {
   outline: none;
-  border-color: var(--wf-node-trigger);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--wf-node-trigger) 15%, transparent);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
 }
 
 .triggerSelectLabel {
@@ -444,8 +530,8 @@
 }
 
 .triggerSelectChevron {
-  color: var(--wf-muted);
-  transition: transform var(--wf-duration-fast) ease;
+  color: #94a3b8;
+  transition: transform 0.15s ease;
   flex-shrink: 0;
 }
 
@@ -459,12 +545,12 @@
   left: 0;
   right: 0;
   z-index: 50;
-  background: var(--wf-surface);
-  border: 1px solid color-mix(in srgb, var(--wf-text) 10%, transparent);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.15);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
   overflow: hidden;
-  animation: dropIn var(--wf-duration-fast) ease;
+  animation: dropIn 0.15s ease;
 }
 
 @keyframes dropIn {
@@ -482,13 +568,13 @@
   background: transparent;
   cursor: pointer;
   text-align: left;
-  transition: background var(--wf-duration-fast) ease;
+  transition: background 0.15s ease;
   font-size: 0.8rem;
-  color: var(--wf-text);
+  color: #0f172a;
 }
 
 .triggerSelectOption:hover {
-  background: color-mix(in srgb, var(--wf-text) 5%, transparent);
+  background: #f8fafc;
 }
 
 .triggerSelectOptionActive {
@@ -497,7 +583,7 @@
 
 .triggerSelectCheck {
   margin-left: auto;
-  color: var(--wf-node-trigger);
+  color: #3b82f6;
   flex-shrink: 0;
 }
 
@@ -506,39 +592,39 @@
   flex-direction: column;
   gap: 6px;
   padding: 10px;
-  background: var(--wf-surface);
+  background: #ffffff;
   border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--wf-text) 6%, transparent);
+  border: 1px solid #e2e8f0;
 }
 
 .configInput {
   width: 100%;
   padding: 6px 10px;
-  background: var(--wf-surface-strong);
-  border: 1px solid color-mix(in srgb, var(--wf-text) 8%, transparent);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 6px;
   font-family: 'Fira Mono', 'Consolas', 'Menlo', monospace;
   font-size: 0.8rem;
-  color: var(--wf-text);
+  color: #0f172a;
   outline: none;
-  transition: border-color var(--wf-duration-fast) ease;
+  transition: border-color 0.15s ease;
   box-sizing: border-box;
 }
 
 .configInput:focus {
-  border-color: var(--wf-node-trigger);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--wf-node-trigger) 15%, transparent);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
 }
 
 .configHint {
   margin: 0;
   font-size: 0.65rem;
-  color: var(--wf-muted);
+  color: #64748b;
 }
 
 .configLabel {
   font-size: 0.75rem;
-  color: var(--wf-muted);
+  color: #64748b;
 }
 
 .currencyConfig {
@@ -553,24 +639,24 @@
   resize: vertical;
   font-family: 'Fira Mono', 'Consolas', 'Menlo', monospace;
   font-size: 0.76rem;
-  color: var(--wf-text);
-  background: var(--wf-surface);
-  border: 1px solid color-mix(in srgb, var(--wf-text) 8%, transparent);
+  color: #0f172a;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 10px;
   outline: none;
-  transition: border-color var(--wf-duration-fast) ease, box-shadow var(--wf-duration-fast) ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
   box-sizing: border-box;
   line-height: 1.5;
 }
 
 .configTextarea:focus {
-  border-color: var(--wf-node-currency);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--wf-node-currency) 15%, transparent);
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
 }
 
 .configTextarea::placeholder {
-  color: var(--wf-muted);
+  color: #94a3b8;
 }
 
 .marketConfig {
@@ -588,19 +674,19 @@
 .configField input {
   width: 100%;
   padding: 6px 10px;
-  background: var(--wf-surface);
-  border: 1px solid color-mix(in srgb, var(--wf-text) 8%, transparent);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 6px;
   font-size: 0.8rem;
-  color: var(--wf-text);
+  color: #0f172a;
   outline: none;
-  transition: border-color var(--wf-duration-fast) ease;
+  transition: border-color 0.15s ease;
   box-sizing: border-box;
 }
 
 .configField input:focus {
-  border-color: var(--wf-node-data);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--wf-node-data) 15%, transparent);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
 }
 
 .errorMessage {
@@ -613,9 +699,9 @@
   display: flex;
   gap: 8px;
   padding: 10px 14px;
-  border-top: 1px solid color-mix(in srgb, var(--wf-text) 6%, transparent);
+  border-top: 1px solid #e2e8f0;
   flex-shrink: 0;
-  background: color-mix(in srgb, var(--wf-text) 2%, transparent);
+  background: #f8fafc;
 }
 
 .btnApply,
@@ -626,7 +712,7 @@
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all var(--wf-duration-fast) ease;
+  transition: all 0.15s ease;
   border: none;
 }
 
@@ -641,24 +727,25 @@
 }
 
 .btnApply {
-  background: var(--wf-text);
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+  background: #0f172a;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.15);
 }
 
 .btnApply:hover {
-  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.25);
+  background: #1e293b;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
 }
 
 .btnDelete {
   background: transparent;
   color: #dc2626;
-  border: 1.5px solid color-mix(in srgb, #dc2626 30%, transparent);
+  border: 1.5px solid #fecaca;
 }
 
 .btnDelete:hover {
-  background: color-mix(in srgb, #dc2626 8%, transparent);
-  border-color: color-mix(in srgb, #dc2626 50%, transparent);
+  background: #fef2f2;
+  border-color: #ef4444;
 }
 
 .btnApply:disabled {
@@ -667,7 +754,7 @@
 }
 
 .btnLoading {
-  background: color-mix(in srgb, var(--wf-text) 85%, transparent) !important;
+  background: #64748b !important;
 }
 
 .btnSuccess {
@@ -689,24 +776,24 @@
   to { transform: rotate(360deg); }
 }
 
-.dataSourceBadge {
+.indicatorDataSource {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background: var(--wf-surface-strong);
-  border: 1px solid color-mix(in srgb, var(--wf-text) 6%, transparent);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
 }
 
-.dataSourceName {
+.indicatorDataSourceName {
   font-size: 0.8rem;
-  color: var(--wf-text);
+  color: #0f172a;
 }
 
-.dataSourceOk {
+.indicatorDataSourceOk {
   font-size: 0.8rem;
-  color: var(--wf-success);
+  color: #22c55e;
 }
 
 .indicatorParams {
@@ -714,9 +801,9 @@
   flex-direction: column;
   gap: 8px;
   padding: 10px;
-  background: var(--wf-surface);
+  background: #ffffff;
   border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--wf-text) 6%, transparent);
+  border: 1px solid #e2e8f0;
 }
 
 .footer .btnApply {

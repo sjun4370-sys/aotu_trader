@@ -377,6 +377,11 @@ function DataTypeSelect({ value, onChange }: DataTypeSelectProps) {
   )
 }
 
+interface IntervalSelectProps {
+  value: string
+  onChange: (value: string) => void
+}
+
 function IntervalSelect({ value, onChange }: IntervalSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -431,11 +436,6 @@ function IntervalSelect({ value, onChange }: IntervalSelectProps) {
       )}
     </div>
   )
-}
-
-interface IntervalSelectProps {
-  value: string
-  onChange: (value: string) => void
 }
 
 function TriggerTypeSelect({ value, onChange }: TriggerTypeSelectProps) {
@@ -527,27 +527,42 @@ function NodeInspectorContent({
     () => (node.config.schedule as string) || '* * * * *'
   )
 
-  // 获取上游节点的输出数据（实际数据或推断数据）
-  const getInputData = () => {
-    const inputData: Record<string, Record<string, unknown>> = {}
-    for (const edge of edges) {
-      if (edge.toNodeId === node.id) {
-        const sourceNode = nodeById.get(edge.fromNodeId)
-        if (!sourceNode) continue
+  // 按输入端口组织数据
+  interface InputPortData {
+    port: { id: string; label: string; direction: string }
+    source: WorkflowNode | null
+    data: Record<string, unknown> | null
+    isInferred: boolean
+    isReal: boolean
+  }
 
-        const key = sourceNode.customName
-        const sourceResult = nodeResults?.get(edge.fromNodeId)
-
-        // 优先使用实际执行结果
-        if (sourceResult?.output) {
-          inputData[key] = sourceResult.output
-        } else {
-          // 没有执行结果时，根据节点配置推断数据
-          inputData[key] = inferOutputFromNodeConfig(sourceNode)
-        }
+  const getInputDataByPort = (): InputPortData[] => {
+    return node.inputs.map(input => {
+      const edge = edges.find(e => e.toNodeId === node.id && e.toPortId === input.id)
+      if (!edge) {
+        return { port: input, source: null, data: null, isInferred: false, isReal: false }
       }
-    }
-    return inputData
+
+      const sourceNode = nodeById.get(edge.fromNodeId)
+      if (!sourceNode) {
+        return { port: input, source: null, data: null, isInferred: false, isReal: false }
+      }
+
+      const sourceResult = nodeResults?.get(edge.fromNodeId)
+      let data: Record<string, unknown>
+      let isReal = false
+
+      // 优先使用实际执行结果
+      if (sourceResult?.output) {
+        data = sourceResult.output
+        isReal = true
+      } else {
+        // 没有执行结果时，根据节点配置推断数据
+        data = inferOutputFromNodeConfig(sourceNode)
+      }
+
+      return { port: input, source: sourceNode, data, isInferred: !isReal, isReal }
+    })
   }
 
   // 根据节点配置推断输出数据
@@ -653,6 +668,167 @@ function NodeInspectorContent({
       case 'loop':
         return { loopCount: (config.count as number) || 3, currentIndex: 0, currentData: [] }
 
+      // 新增节点类型推断
+      case 'okx_ticker':
+        return {
+          inst_id: (config.inst_id as string) || 'BTC-USDT',
+          last: 50000,
+          bid: 49999,
+          ask: 50001,
+          open_24h: '49000',
+          high_24h: '51000',
+          low_24h: '48000',
+          vol_24h: '1000000',
+          change_24h: '2.5'
+        }
+
+      case 'okx_candles':
+        return {
+          inst_id: (config.inst_id as string) || 'BTC-USDT',
+          bar: (config.bar as string) || '1h',
+          candles: [],
+          closes: [],
+          count: 0,
+          latest_close: 50000
+        }
+
+      case 'okx_orderbook':
+        return {
+          inst_id: (config.inst_id as string) || 'BTC-USDT',
+          bids: [[49999, 1], [49998, 2], [49997, 3]],
+          asks: [[50001, 1], [50002, 2], [50003, 3]],
+          best_bid: 49999,
+          best_ask: 50001
+        }
+
+      case 'okx_account':
+        return {
+          inst_id: (config.inst_id as string) || 'BTC-USDT',
+          balances: [
+            { asset: 'BTC', free: 1.5, locked: 0.1 },
+            { asset: 'ETH', free: 10.0, locked: 0.5 },
+            { asset: 'USDT', free: 50000, locked: 0 }
+          ],
+          equity: 100000
+        }
+
+      case 'okx_positions':
+        return {
+          inst_id: (config.inst_id as string) || 'BTC-USDT',
+          positions: [],
+          total_upl: 0
+        }
+
+      case 'rsi':
+        return {
+          inst_id: (config.inst_id as string) || 'BTC-USDT',
+          period: (config.period as number) || 14,
+          rsi: 50,
+          signal: 'neutral',
+          trend: 'sideways',
+          history: []
+        }
+
+      case 'macd':
+        return {
+          inst_id: (config.inst_id as string) || 'BTC-USDT',
+          fast: 12,
+          slow: 26,
+          signal: 9,
+          macd: 0,
+          histogram: 0,
+          crossover: 'none'
+        }
+
+      case 'bollinger':
+        return {
+          inst_id: (config.inst_id as string) || 'BTC-USDT',
+          period: 20,
+          stdDev: 2,
+          upper: 51000,
+          middle: 50000,
+          lower: 49000
+        }
+
+      case 'ma':
+        return {
+          inst_id: (config.inst_id as string) || 'BTC-USDT',
+          period: 20,
+          ma_type: 'sma',
+          ma: 50000,
+          trend: 'up'
+        }
+
+      case 'llm_analysis':
+        return {
+          provider: (config.provider as string) || 'openai',
+          model: (config.model as string) || 'gpt-4',
+          analysis: '等待AI分析...',
+          sentiment: 'neutral',
+          recommendation: 'hold',
+          confidence: 0.5
+        }
+
+      case 'signal_generator':
+        return {
+          action: 'hold',
+          confidence: 0.5,
+          reason: '等待信号生成'
+        }
+
+      case 'risk_check':
+        return {
+          approved: true,
+          reason: '风控检查通过'
+        }
+
+      case 'stop_loss':
+        return {
+          triggered: false,
+          reason: '未触发止损'
+        }
+
+      case 'take_profit':
+        return {
+          triggered: false,
+          reason: '未触发止盈'
+        }
+
+      case 'position_sizing':
+        return {
+          qty: 0,
+          value: 0,
+          reason: '等待计算'
+        }
+
+      case 'create_order':
+        return {
+          order_id: '-',
+          symbol: (config.symbol as string) || 'BTC-USDT',
+          side: 'buy',
+          qty: 0,
+          price: 0,
+          status: 'pending'
+        }
+
+      case 'monitor_order':
+        return {
+          status: 'pending',
+          filled_qty: 0
+        }
+
+      case 'cancel_order':
+        return {
+          success: false,
+          reason: '等待取消'
+        }
+
+      case 'query_position':
+        return {
+          positions: [],
+          total_upl: 0
+        }
+
       default:
         return {}
     }
@@ -699,8 +875,8 @@ function NodeInspectorContent({
 
       case 'strategy': {
         let action: 'buy' | 'sell' | 'hold' = 'hold'
-        for (const upstream of Object.values(inputData)) {
-          if (upstream && Array.isArray((upstream as { indicators?: unknown[] }).indicators)) {
+        for (const item of inputDataByPort) {
+          if (item.data && Array.isArray((item.data as { indicators?: unknown[] }).indicators)) {
             action = Math.random() > 0.5 ? 'buy' : 'sell'
             break
           }
@@ -765,6 +941,167 @@ function NodeInspectorContent({
         }
       }
 
+      // 新增节点类型推断
+      case 'okx_ticker':
+        return {
+          inst_id: (config.inst_id as string) || 'BTC-USDT',
+          last: 50000,
+          bid: 49999,
+          ask: 50001,
+          open_24h: '49000',
+          high_24h: '51000',
+          low_24h: '48000',
+          vol_24h: '1000000',
+          change_24h: '2.5'
+        }
+
+      case 'okx_candles':
+        return {
+          inst_id: (config.inst_id as string) || 'BTC-USDT',
+          bar: (config.bar as string) || '1h',
+          candles: [],
+          closes: [],
+          count: 0,
+          latest_close: 50000
+        }
+
+      case 'okx_orderbook':
+        return {
+          inst_id: (config.inst_id as string) || 'BTC-USDT',
+          bids: [[49999, 1], [49998, 2], [49997, 3]],
+          asks: [[50001, 1], [50002, 2], [50003, 3]],
+          best_bid: 49999,
+          best_ask: 50001
+        }
+
+      case 'okx_account':
+        return {
+          inst_id: (config.inst_id as string) || 'BTC-USDT',
+          balances: [
+            { asset: 'BTC', free: 1.5, locked: 0.1 },
+            { asset: 'ETH', free: 10.0, locked: 0.5 },
+            { asset: 'USDT', free: 50000, locked: 0 }
+          ],
+          equity: 100000
+        }
+
+      case 'okx_positions':
+        return {
+          inst_id: (config.inst_id as string) || 'BTC-USDT',
+          positions: [],
+          total_upl: 0
+        }
+
+      case 'rsi':
+        return {
+          inst_id: (config.inst_id as string) || 'BTC-USDT',
+          period: (config.period as number) || 14,
+          rsi: 50,
+          signal: 'neutral',
+          trend: 'sideways',
+          history: []
+        }
+
+      case 'macd':
+        return {
+          inst_id: (config.inst_id as string) || 'BTC-USDT',
+          fast: 12,
+          slow: 26,
+          signal: 9,
+          macd: 0,
+          histogram: 0,
+          crossover: 'none'
+        }
+
+      case 'bollinger':
+        return {
+          inst_id: (config.inst_id as string) || 'BTC-USDT',
+          period: 20,
+          stdDev: 2,
+          upper: 51000,
+          middle: 50000,
+          lower: 49000
+        }
+
+      case 'ma':
+        return {
+          inst_id: (config.inst_id as string) || 'BTC-USDT',
+          period: 20,
+          ma_type: 'sma',
+          ma: 50000,
+          trend: 'up'
+        }
+
+      case 'llm_analysis':
+        return {
+          provider: (config.provider as string) || 'openai',
+          model: (config.model as string) || 'gpt-4',
+          analysis: 'AI 分析结果预览...',
+          sentiment: 'neutral',
+          recommendation: 'hold',
+          confidence: 0.5
+        }
+
+      case 'signal_generator':
+        return {
+          action: 'hold',
+          confidence: 0.5,
+          reason: '策略信号预览'
+        }
+
+      case 'risk_check':
+        return {
+          approved: true,
+          reason: '风控检查通过'
+        }
+
+      case 'stop_loss':
+        return {
+          triggered: false,
+          reason: '未触发止损'
+        }
+
+      case 'take_profit':
+        return {
+          triggered: false,
+          reason: '未触发止盈'
+        }
+
+      case 'position_sizing':
+        return {
+          qty: 0,
+          value: 0,
+          reason: '等待计算'
+        }
+
+      case 'create_order':
+        return {
+          order_id: '-',
+          symbol: (config.symbol as string) || 'BTC-USDT',
+          side: 'buy',
+          qty: 0,
+          price: 0,
+          status: 'pending'
+        }
+
+      case 'monitor_order':
+        return {
+          status: 'pending',
+          filled_qty: 0
+        }
+
+      case 'cancel_order':
+        return {
+          success: false,
+          reason: '等待取消'
+        }
+
+      case 'query_position':
+        return {
+          positions: [],
+          total_upl: 0
+        }
+
       default:
         return {}
     }
@@ -796,11 +1133,16 @@ function NodeInspectorContent({
     return inferCurrentOutput()
   }
 
-  const inputData = getInputData()
+  const inputDataByPort = getInputDataByPort()
   const outputData = getOutputData()
   const isRunning = runningNodeId === node.id
   const currentResult = nodeResults?.get(node.id)
   const hasRealResults = currentResult?.output !== undefined
+
+  // 判断是否有任何输入数据
+  const hasInputData = inputDataByPort.some(item => item.data !== null)
+  // 判断是否有任何推断数据
+  const hasInferredInputData = inputDataByPort.some(item => item.isInferred)
   const [isSaving, setIsSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [selectedDataType, setSelectedDataType] = useState<string>(
@@ -877,13 +1219,13 @@ function NodeInspectorContent({
   // 市场节点：从上游获取可用币种
   const upstreamCurrencies: CurrencyOption[] = useMemo(() => {
     if (node.type !== 'market') return []
-    for (const upstream of Object.values(inputData)) {
-      if (upstream && Array.isArray((upstream as { currencies?: unknown[] }).currencies)) {
-        return ((upstream as { currencies: { code: string; name: string }[] }).currencies)
+    for (const item of inputDataByPort) {
+      if (item.data && Array.isArray((item.data as { currencies?: unknown[] }).currencies)) {
+        return ((item.data as { currencies: { code: string; name: string }[] }).currencies)
       }
     }
     return []
-  }, [node.type, inputData])
+  }, [node.type, inputDataByPort])
 
   const [selectedMarketCurrencies, setSelectedMarketCurrencies] = useState<string[]>(
     () => {
@@ -902,18 +1244,6 @@ function NodeInspectorContent({
     }
   }, [node.type, upstreamCurrencies, selectedMarketCurrencies.length])
 
-  // 判断输入数据是否为推断数据
-  const getInputDataStatus = () => {
-    for (const edge of edges) {
-      if (edge.toNodeId === node.id) {
-        const sourceResult = nodeResults?.get(edge.fromNodeId)
-        if (sourceResult?.output) return 'real'
-      }
-    }
-    return Object.keys(inputData).length > 0 ? 'inferred' : 'none'
-  }
-
-  const inputDataStatus = getInputDataStatus()
 
   const handleApply = () => {
     try {
@@ -1126,9 +1456,9 @@ function NodeInspectorContent({
                     {compatibleSources.length === 0 ? (
                       <p className={styles.configHint}>暂无可用的K线数据源（请先连接市场数据节点）</p>
                     ) : compatibleSources.length === 1 ? (
-                      <div className={styles.dataSourceBadge}>
-                        <span className={styles.dataSourceName}>{compatibleSources[0].nodeLabel}</span>
-                        <span className={styles.dataSourceOk}>✓</span>
+                      <div className={styles.indicatorDataSource}>
+                        <span className={styles.indicatorDataSourceName}>{compatibleSources[0].nodeLabel}</span>
+                        <span className={styles.indicatorDataSourceOk}>✓</span>
                       </div>
                     ) : (
                       <SimpleSelect
@@ -1171,7 +1501,7 @@ function NodeInspectorContent({
                             value={String(indicatorParams[param.name] ?? param.default)}
                             onChange={(val) => setIndicatorParams(prev => ({
                               ...prev,
-                              [param.name]: val
+                              [param.name]: Number(val)
                             }))}
                             options={param.options}
                           />
@@ -1248,41 +1578,56 @@ function NodeInspectorContent({
           <h3 className={styles.sectionTitle}>输入数据</h3>
           {isRunning ? (
             <p className={styles.statusText} data-status="running">执行中...</p>
-          ) : Object.keys(inputData).length > 0 ? (
+          ) : hasInputData ? (
             <>
-              {inputDataStatus === 'inferred' && (
+              {hasInferredInputData && (
                 <p className={styles.inferredHint}>
                   <span className={styles.hintIcon}>💡</span>
-                  显示推断数据结构，运行后将显示实际数据
+                  部分数据为推断结构，运行后将显示实际数据
                 </p>
               )}
               <div className={styles.viewerWrapper}>
-                {Object.entries(inputData).map(([key, data]) => {
-                  // 找到对应的上游节点
-                  const sourceNode = nodes.find(n => n.customName === key)
-                  return (
-                    <div key={key} className={styles.inputViewerItem}>
-                      <div className={styles.inputSourceLabel}>
-                        <span className={styles.sourceName}>{key}</span>
-                        {inputDataStatus === 'inferred' && (
-                          <span className={styles.dataSource}>推断</span>
-                        )}
-                        {inputDataStatus === 'real' && (
-                          <span className={styles.dataSource} data-source="real">实际</span>
+                {inputDataByPort.map((item) => (
+                  <div key={item.port.id} className={styles.inputPortCard}>
+                    <div className={styles.inputPortHeader}>
+                      <div className={styles.inputPortInfo}>
+                        <span className={styles.inputPortLabel}>{item.port.label}</span>
+                        {item.source ? (
+                          <span className={styles.sourceNodeTag}>
+                            来自: {item.source.label}
+                            <span className={styles.sourceNodeId}>({item.source.id.slice(0, 8)})</span>
+                          </span>
+                        ) : (
+                          <span className={styles.sourceNodeTag} data-empty="true">未连接</span>
                         )}
                       </div>
-                      <NodeDataViewer
-                        node={sourceNode || { type: 'start', customName: key, id: '', category: 'data', label: key, position: { x: 0, y: 0 }, size: { width: 0, height: 0 }, inputs: [], outputs: [], config: {}, status: 'enabled' }}
-                        data={data}
-                        isInferred={inputDataStatus === 'inferred'}
-                      />
+                      {item.data && (
+                        <span
+                          className={styles.dataSourceBadge}
+                          data-real={item.isReal}
+                          data-inferred={item.isInferred}
+                        >
+                          {item.isReal ? '实际' : '推断'}
+                        </span>
+                      )}
                     </div>
-                  )
-                })}
+                    {item.data ? (
+                      <NodeDataViewer
+                        node={item.source || { type: 'start', customName: item.port.label, id: '', category: 'data', label: item.port.label, position: { x: 0, y: 0 }, size: { width: 0, height: 0 }, inputs: [], outputs: [], config: {}, status: 'enabled' }}
+                        data={item.data}
+                        isInferred={item.isInferred}
+                      />
+                    ) : (
+                      <p className={styles.emptyPortData}>此端口未连接数据源</p>
+                    )}
+                  </div>
+                ))}
               </div>
             </>
-          ) : (
+          ) : node.inputs.length > 0 ? (
             <p className={styles.emptyText}>暂无输入数据（请先连接上游节点）</p>
+          ) : (
+            <p className={styles.emptyText}>此节点无输入端口</p>
           )}
         </section>
 

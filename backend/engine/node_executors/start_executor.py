@@ -1,5 +1,5 @@
 """
-循环节点执行器
+开始节点执行器
 """
 
 from __future__ import annotations
@@ -21,27 +21,23 @@ async def execute_node(
     config: Dict,
     context: ExecutionContext
 ) -> NodeOutput:
-    """
-    执行循环节点 - 1入1出
-    返回包含loop_type和count信息的NodeOutput
-    """
+    """执行开始节点"""
     timestamp = time.time()
-    loop_type = config.get("loopType", "count")
-    count = config.get("count", 1)
+    trigger_type = config.get("trigger_type", "manual")
 
-    logger.debug(f"执行循环节点: {loop_type}, 次数={count}")
+    logger.debug(f"[Start] 触发类型: {trigger_type}")
 
     output = {
-        "loop_type": loop_type,
-        "count": count,
-        "iterations": [],  # 实际应记录每次迭代的结果
-        "completed": True,
+        "triggered": True,
+        "trigger_type": trigger_type,
+        "execution_id": context.execution_id,
+        "timestamp": context.execution_id.split("_")[1] if "_" in context.execution_id else None,
     }
 
     return NodeOutput(
         success=True,
         node_id=node_id,
-        node_type="loop",
+        node_type="start",
         data=output,
         timestamp=timestamp
     )

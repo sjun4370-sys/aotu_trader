@@ -179,7 +179,7 @@ export function getNodeOutputSchema(nodeType: string): DataField[] {
 }
 
 // 根据上游节点类型推断输出数据结构
-export function inferOutputFromNodeType(nodeType: string, customName: string): Record<string, unknown> {
+export function inferOutputFromNodeType(nodeType: string, _customName: string): Record<string, unknown> {
   const mockOutputs: Record<string, Record<string, unknown>> = {
     start: {
       triggered: true,

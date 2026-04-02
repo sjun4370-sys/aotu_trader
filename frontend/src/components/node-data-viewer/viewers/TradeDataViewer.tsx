@@ -49,14 +49,14 @@ export default function TradeDataViewer({ data, isInferred }: Props) {
             {!status && '-'}
           </span>
         </div>
-        {data.total && (
+        {data.total ? (
           <div className={styles.infoItem}>
             <span className={styles.infoLabel}>总金额</span>
             <span className={styles.infoValue} style={{ fontWeight: 600 }}>
               ${Number(data.total).toFixed(2)}
             </span>
           </div>
-        )}
+        ) : null}
       </div>
     </BaseDataViewer>
   )

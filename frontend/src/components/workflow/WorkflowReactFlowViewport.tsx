@@ -295,7 +295,20 @@ export default function WorkflowReactFlowViewport({
 }: WorkflowReactFlowViewportProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const draggingNodeIdsRef = useRef<string[]>([])
+  const onViewportLiveChangeRef = useRef(onViewportLiveChange)
+  const localViewportRef = useRef<Viewport>({
+    x: canvasOffset.x,
+    y: canvasOffset.y,
+    zoom,
+  })
   const [draggingNodeIds, setDraggingNodeIds] = useState<string[]>([])
+
+  // 保持回调引用最新
+  useEffect(() => {
+    onViewportLiveChangeRef.current = onViewportLiveChange
+  }, [onViewportLiveChange])
+
+  // 同步 ref 和 state
   const [localViewport, setLocalViewport] = useState<Viewport>({
     x: canvasOffset.x,
     y: canvasOffset.y,
@@ -312,23 +325,76 @@ export default function WorkflowReactFlowViewport({
     }
   }, [viewportRef])
 
+  // 使用原生事件监听器（非 passive）来处理滚轮缩放
   useEffect(() => {
-    const syncViewport = () => {
-      setLocalViewport((current) => {
-        if (current.x === canvasOffset.x && current.y === canvasOffset.y && current.zoom === zoom) {
-          return current
+    const wrapper = wrapperRef.current
+    if (!wrapper) return
+
+    const handleWheelNative = (event: WheelEvent) => {
+      event.preventDefault()
+
+      const wrapper = wrapperRef.current
+      if (!wrapper) return
+
+      const rect = wrapper.getBoundingClientRect()
+      const point = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      }
+
+      // 从 ref 读取当前状态（避免在 setState updater 中访问）
+      const current = localViewportRef.current
+      let nextViewport = current
+
+      if (event.ctrlKey) {
+        const nextZoom = Math.min(1.8, Math.max(0.5, Math.round((current.zoom + (event.deltaY < 0 ? 0.1 : -0.1)) * 10) / 10))
+        if (nextZoom === current.zoom) {
+          return
         }
 
-        return {
-          x: canvasOffset.x,
-          y: canvasOffset.y,
-          zoom,
+        const worldX = (point.x - current.x) / current.zoom
+        const worldY = (point.y - current.y) / current.zoom
+        nextViewport = {
+          x: point.x - worldX * nextZoom,
+          y: point.y - worldY * nextZoom,
+          zoom: nextZoom,
         }
-      })
+      } else if (event.shiftKey) {
+        nextViewport = {
+          ...current,
+          x: current.x - event.deltaY,
+        }
+      } else {
+        nextViewport = {
+          ...current,
+          x: current.x - event.deltaX,
+          y: current.y - event.deltaY,
+        }
+      }
+
+      // 更新 ref 和 state
+      localViewportRef.current = nextViewport
+      setLocalViewport(nextViewport)
+
+      // 同步通知父组件（在渲染外）
+      onViewportLiveChangeRef.current?.(nextViewport)
     }
 
-    const frameId = requestAnimationFrame(syncViewport)
-    return () => cancelAnimationFrame(frameId)
+    wrapper.addEventListener('wheel', handleWheelNative, { passive: false })
+    return () => {
+      wrapper.removeEventListener('wheel', handleWheelNative)
+    }
+  }, [])
+
+  // 同步外部 viewport 变化到本地状态和 ref
+  useEffect(() => {
+    const newViewport = { x: canvasOffset.x, y: canvasOffset.y, zoom }
+    localViewportRef.current = newViewport
+    setLocalViewport(newViewport)
+  }, [canvasOffset.x, canvasOffset.y, zoom])
+
+  // 外部 nodes 变化时同步到 rfNodes，但拖动期间只更新非拖动节点的非位置字段
+  useEffect(() => {
   }, [canvasOffset.x, canvasOffset.y, zoom])
 
   // 外部 nodes 变化时同步到 rfNodes，但拖动期间只更新非拖动节点的非位置字段
@@ -392,54 +458,6 @@ export default function WorkflowReactFlowViewport({
     })
   ), [rfNodes])
 
-  const handleWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
-    event.preventDefault()
-
-    const wrapper = wrapperRef.current
-    if (!wrapper) {
-      return
-    }
-
-    const rect = wrapper.getBoundingClientRect()
-      const point = {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
-      }
-
-      setLocalViewport((current) => {
-        let nextViewport = current
-
-        if (event.ctrlKey) {
-          const nextZoom = Math.min(1.8, Math.max(0.5, Math.round((current.zoom + (event.deltaY < 0 ? 0.1 : -0.1)) * 10) / 10))
-          if (nextZoom === current.zoom) {
-            return current
-          }
-
-          const worldX = (point.x - current.x) / current.zoom
-          const worldY = (point.y - current.y) / current.zoom
-          nextViewport = {
-            x: point.x - worldX * nextZoom,
-            y: point.y - worldY * nextZoom,
-            zoom: nextZoom,
-          }
-        } else if (event.shiftKey) {
-          nextViewport = {
-            ...current,
-            x: current.x - event.deltaY,
-          }
-        } else {
-          nextViewport = {
-            ...current,
-            x: current.x - event.deltaX,
-            y: current.y - event.deltaY,
-          }
-        }
-
-        onViewportLiveChange?.(nextViewport)
-        return nextViewport
-      })
-  }, [onViewportLiveChange])
-
   const handleNodeDragStop = useCallback((_event: ReactMouseEvent, node: Node<WorkflowReactFlowNodeData>) => {
     draggingNodeIdsRef.current = draggingNodeIdsRef.current.filter((id) => id !== node.id)
     setDraggingNodeIds(draggingNodeIdsRef.current)
@@ -458,6 +476,7 @@ export default function WorkflowReactFlowViewport({
   }, [])
 
   const handleMove = useCallback((_event: MouseEvent | TouchEvent | null, nextViewport: Viewport) => {
+    localViewportRef.current = nextViewport
     setLocalViewport(nextViewport)
     onViewportLiveChange?.(nextViewport)
   }, [onViewportLiveChange])
@@ -486,7 +505,6 @@ export default function WorkflowReactFlowViewport({
       ref={setWrapperRef}
       data-testid="workflow-canvas"
       className={className}
-      onWheel={handleWheel}
       onClick={onBackgroundClick}
       onPointerDownCapture={handleWrapperPointerDown}
     >

@@ -27,6 +27,10 @@ function StatusBadge({ status }: { status: WorkflowRuntimeStatus }) {
           <span className={styles.pulseDot} />
           运行中
         </>
+      ) : status === 'failed' ? (
+        '执行失败'
+      ) : status === 'stopped' ? (
+        '已停止'
       ) : (
         '空闲'
       )}

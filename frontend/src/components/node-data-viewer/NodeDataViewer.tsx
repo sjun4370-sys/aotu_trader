@@ -2,7 +2,6 @@
  * 节点数据可视化展示组件
  */
 import type { WorkflowNode } from '../../types/workflow'
-import type { NodeExecutionResult } from '../../types/workflowExecution'
 import StartDataViewer from './viewers/StartDataViewer'
 import CurrencyDataViewer from './viewers/CurrencyDataViewer'
 import MarketDataViewer from './viewers/MarketDataViewer'
@@ -14,7 +13,6 @@ import TradeDataViewer from './viewers/TradeDataViewer'
 import ConditionDataViewer from './viewers/ConditionDataViewer'
 import LoopDataViewer from './viewers/LoopDataViewer'
 import GenericDataViewer from './viewers/GenericDataViewer'
-import styles from './NodeDataViewer.module.css'
 
 interface NodeDataViewerProps {
   node: WorkflowNode

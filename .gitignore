@@ -86,3 +86,8 @@ coverage/
 .sisyphus
 .worktrees/*
 .omc/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3

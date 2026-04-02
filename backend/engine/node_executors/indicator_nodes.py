@@ -1,47 +1,121 @@
 """
-技术指标节点执行器 - 使用TA-Lib真实计算
+技术指标节点执行器 - 使用pandas/numpy计算，不依赖TA-Lib
 """
 
+from __future__ import annotations
+
 import logging
-from typing import Any, Dict, List
+import time
+from typing import Any, Dict
 from decimal import Decimal
 import numpy as np
-import talib
+import pandas as pd
 
-from engine.workflow_engine import ExecutionContext
+from engine.context import ExecutionContext
+from engine.node_output import NodeOutput
 
 logger = logging.getLogger(__name__)
 
 
-def to_numpy_array(data: List[Decimal]) -> np.ndarray:
+def to_numpy_array(data: list) -> np.ndarray:
     """将Decimal列表转换为numpy数组"""
     return np.array([float(x) for x in data], dtype=np.float64)
 
 
-async def execute_rsi(node: Dict, context: ExecutionContext) -> Any:
-    """RSI指标节点 - 真实计算"""
-    config = node.get("config", {})
+def to_pandas_series(data: list) -> pd.Series:
+    """将Decimal列表转换为pandas Series"""
+    return pd.Series([float(x) for x in data])
+
+
+def _calc_rsi(closes: pd.Series, period: int) -> pd.Series:
+    """计算RSI指标"""
+    delta = closes.diff()
+    gain = delta.where(delta > 0, 0.0)
+    loss = -delta.where(delta < 0, 0.0)
+
+    avg_gain = gain.rolling(window=period, min_periods=period).mean()
+    avg_loss = loss.rolling(window=period, min_periods=period).mean()
+
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+
+def _calc_ema(series: pd.Series, span: int) -> pd.Series:
+    """计算EMA"""
+    return series.ewm(span=span, adjust=False).mean()
+
+
+async def execute_node(
+    node_id: str,
+    node_type: str,
+    inputs: Dict[str, NodeOutput],
+    config: Dict,
+    context: ExecutionContext
+) -> NodeOutput:
+    """技术指标节点执行器入口"""
+    timestamp = time.time()
+
+    if node_type == "rsi":
+        return await _execute_rsi(node_id, inputs, config, context, timestamp)
+    elif node_type == "macd":
+        return await _execute_macd(node_id, inputs, config, context, timestamp)
+    elif node_type == "bollinger":
+        return await _execute_bollinger(node_id, inputs, config, context, timestamp)
+    elif node_type == "ma":
+        return await _execute_ma(node_id, inputs, config, context, timestamp)
+    else:
+        return NodeOutput(
+            success=False,
+            node_id=node_id,
+            node_type=node_type,
+            data={},
+            timestamp=timestamp,
+            error=f"Unknown node type: {node_type}"
+        )
+
+
+async def _execute_rsi(
+    node_id: str,
+    inputs: Dict[str, NodeOutput],
+    config: Dict,
+    context: ExecutionContext,
+    timestamp: float
+) -> NodeOutput:
+    """RSI指标节点"""
     inst_id = config.get("inst_id", "BTC-USDT")
     period = config.get("period", 14)
-    bar = config.get("bar", "1H")
 
-    # 从上下文获取K线数据
-    candles_key = f"{inst_id}_candles_{bar}"
-    candles = context.variables.get(candles_key)
+    if not inputs:
+        return NodeOutput(
+            success=False,
+            node_id=node_id,
+            node_type="rsi",
+            data={},
+            timestamp=timestamp,
+            error="RSI节点需要输入K线数据"
+        )
+
+    candles_output = list(inputs.values())[0]
+    candles = candles_output.data.get("candles", [])
+    inst_id = candles_output.data.get("inst_id", inst_id)
 
     if not candles:
-        raise Exception(f"未找到 {inst_id} 的K线数据，请先添加OKX K线节点")
+        return NodeOutput(
+            success=False,
+            node_id=node_id,
+            node_type="rsi",
+            data={},
+            timestamp=timestamp,
+            error=f"未找到 {inst_id} 的K线数据，请先添加OKX K线节点"
+        )
 
-    logger.info(f"[TA-Lib] 计算 {inst_id} RSI({period})")
+    logger.info(f"[TA] 计算 {inst_id} RSI({period})")
 
-    # 提取收盘价
-    closes = to_numpy_array([c["close"] for c in candles])
+    closes = to_pandas_series([c["close"] for c in candles])
+    rsi_values = _calc_rsi(closes, period)
+    current_rsi = rsi_values.iloc[-1]
 
-    # 计算RSI
-    rsi_values = talib.RSI(closes, timeperiod=period)
-    current_rsi = rsi_values[-1]
-
-    # 确定信号
     if np.isnan(current_rsi):
         signal = "insufficient_data"
     elif current_rsi > 70:
@@ -51,10 +125,9 @@ async def execute_rsi(node: Dict, context: ExecutionContext) -> Any:
     else:
         signal = "neutral"
 
-    # 计算RSI趋势
     rsi_trend = "flat"
     if len(rsi_values) > 5:
-        recent_rsi = rsi_values[-5:]
+        recent_rsi = rsi_values.iloc[-5:].values
         if recent_rsi[-1] > recent_rsi[0]:
             rsi_trend = "rising"
         elif recent_rsi[-1] < recent_rsi[0]:
@@ -67,15 +140,22 @@ async def execute_rsi(node: Dict, context: ExecutionContext) -> Any:
         "signal": signal,
         "trend": rsi_trend,
         "history": [
-            round(float(x), 2) if not np.isnan(x) else None for x in rsi_values[-20:]
+            round(float(x), 2) if not np.isnan(x) else None for x in rsi_values.iloc[-20:].values
         ],
         "interpretation": _interpret_rsi(current_rsi, signal),
     }
 
     context.variables[f"{inst_id}_rsi_{period}"] = current_rsi
-    logger.info(f"[TA-Lib] RSI: {output['rsi']}, 信号: {signal}")
+    context.variables["rsi"] = current_rsi
+    logger.info(f"[TA] RSI: {output['rsi']}, 信号: {signal}")
 
-    return output
+    return NodeOutput(
+        success=True,
+        node_id=node_id,
+        node_type="rsi",
+        data=output,
+        timestamp=timestamp
+    )
 
 
 def _interpret_rsi(rsi: float, signal: str) -> str:
@@ -91,48 +171,69 @@ def _interpret_rsi(rsi: float, signal: str) -> str:
     return interpretations.get(signal, "未知信号")
 
 
-async def execute_macd(node: Dict, context: ExecutionContext) -> Any:
-    """MACD指标节点 - 真实计算"""
-    config = node.get("config", {})
+async def _execute_macd(
+    node_id: str,
+    inputs: Dict[str, NodeOutput],
+    config: Dict,
+    context: ExecutionContext,
+    timestamp: float
+) -> NodeOutput:
+    """MACD指标节点"""
     inst_id = config.get("inst_id", "BTC-USDT")
     fast = config.get("fast_period", 12)
     slow = config.get("slow_period", 26)
-    signal = config.get("signal_period", 9)
-    bar = config.get("bar", "1H")
+    signal_period = config.get("signal_period", 9)
 
-    candles_key = f"{inst_id}_candles_{bar}"
-    candles = context.variables.get(candles_key)
+    if not inputs:
+        return NodeOutput(
+            success=False,
+            node_id=node_id,
+            node_type="macd",
+            data={},
+            timestamp=timestamp,
+            error="MACD节点需要输入K线数据"
+        )
+
+    candles_output = list(inputs.values())[0]
+    candles = candles_output.data.get("candles", [])
+    inst_id = candles_output.data.get("inst_id", inst_id)
 
     if not candles:
-        raise Exception(f"未找到 {inst_id} 的K线数据")
+        return NodeOutput(
+            success=False,
+            node_id=node_id,
+            node_type="macd",
+            data={},
+            timestamp=timestamp,
+            error=f"未找到 {inst_id} 的K线数据"
+        )
 
-    logger.info(f"[TA-Lib] 计算 {inst_id} MACD({fast},{slow},{signal})")
+    logger.info(f"[TA] 计算 {inst_id} MACD({fast},{slow},{signal_period})")
 
-    closes = to_numpy_array([c["close"] for c in candles])
+    closes = to_pandas_series([c["close"] for c in candles])
 
-    # 计算MACD
-    macd, macd_signal, macd_hist = talib.MACD(
-        closes, fastperiod=fast, slowperiod=slow, signalperiod=signal
-    )
+    ema_fast = _calc_ema(closes, fast)
+    ema_slow = _calc_ema(closes, slow)
+    macd_line = ema_fast - ema_slow
+    macd_signal_line = _calc_ema(macd_line, signal_period)
+    macd_hist = macd_line - macd_signal_line
 
-    current_macd = macd[-1]
-    current_signal = macd_signal[-1]
-    current_hist = macd_hist[-1]
+    current_macd = macd_line.iloc[-1]
+    current_signal = macd_signal_line.iloc[-1]
+    current_hist = macd_hist.iloc[-1]
 
-    # 确定信号
     if np.isnan(current_macd) or np.isnan(current_signal):
         macd_signal_type = "insufficient_data"
         crossover = None
     else:
-        # 金叉/死叉检测
-        prev_macd = macd[-2] if len(macd) > 1 else current_macd
-        prev_signal = macd_signal[-2] if len(macd_signal) > 1 else current_signal
+        prev_macd = macd_line.iloc[-2] if len(macd_line) > 1 else current_macd
+        prev_signal = macd_signal_line.iloc[-2] if len(macd_signal_line) > 1 else current_signal
 
         if prev_macd < prev_signal and current_macd > current_signal:
-            crossover = "golden"  # 金叉
+            crossover = "golden"
             macd_signal_type = "bullish"
         elif prev_macd > prev_signal and current_macd < current_signal:
-            crossover = "death"  # 死叉
+            crossover = "death"
             macd_signal_type = "bearish"
         elif current_macd > current_signal:
             macd_signal_type = "bullish_trend"
@@ -144,25 +245,24 @@ async def execute_macd(node: Dict, context: ExecutionContext) -> Any:
     output = {
         "inst_id": inst_id,
         "macd": round(float(current_macd), 4) if not np.isnan(current_macd) else None,
-        "signal": round(float(current_signal), 4)
-        if not np.isnan(current_signal)
-        else None,
-        "histogram": round(float(current_hist), 4)
-        if not np.isnan(current_hist)
-        else None,
+        "signal": round(float(current_signal), 4) if not np.isnan(current_signal) else None,
+        "histogram": round(float(current_hist), 4) if not np.isnan(current_hist) else None,
         "crossover": crossover,
         "trend": macd_signal_type,
-        "interpretation": _interpret_macd(
-            current_macd, current_signal, current_hist, crossover
-        ),
+        "interpretation": _interpret_macd(current_macd, current_signal, current_hist, crossover),
     }
 
     context.variables[f"{inst_id}_macd"] = output
-    logger.info(
-        f"[TA-Lib] MACD: {output['macd']}, Signal: {output['signal']}, 趋势: {macd_signal_type}"
-    )
+    context.variables["macd"] = output
+    logger.info(f"[TA] MACD: {output['macd']}, Signal: {output['signal']}, 趋势: {macd_signal_type}")
 
-    return output
+    return NodeOutput(
+        success=True,
+        node_id=node_id,
+        node_type="macd",
+        data=output,
+        timestamp=timestamp
+    )
 
 
 def _interpret_macd(macd: float, signal: float, hist: float, crossover: str) -> str:
@@ -180,88 +280,96 @@ def _interpret_macd(macd: float, signal: float, hist: float, crossover: str) -> 
         return f"MACD({macd:.3f})在Signal({signal:.3f})下方，空头趋势"
 
 
-async def execute_bollinger(node: Dict, context: ExecutionContext) -> Any:
-    """布林带节点 - 真实计算"""
-    config = node.get("config", {})
+async def _execute_bollinger(
+    node_id: str,
+    inputs: Dict[str, NodeOutput],
+    config: Dict,
+    context: ExecutionContext,
+    timestamp: float
+) -> NodeOutput:
+    """布林带节点"""
     inst_id = config.get("inst_id", "BTC-USDT")
     period = config.get("period", 20)
     std_dev = config.get("std_dev", 2)
-    bar = config.get("bar", "1H")
 
-    candles_key = f"{inst_id}_candles_{bar}"
-    candles = context.variables.get(candles_key)
+    if not inputs:
+        return NodeOutput(
+            success=False,
+            node_id=node_id,
+            node_type="bollinger",
+            data={},
+            timestamp=timestamp,
+            error="布林带节点需要输入K线数据"
+        )
+
+    candles_output = list(inputs.values())[0]
+    candles = candles_output.data.get("candles", [])
+    inst_id = candles_output.data.get("inst_id", inst_id)
 
     if not candles:
-        raise Exception(f"未找到 {inst_id} 的K线数据")
+        return NodeOutput(
+            success=False,
+            node_id=node_id,
+            node_type="bollinger",
+            data={},
+            timestamp=timestamp,
+            error=f"未找到 {inst_id} 的K线数据"
+        )
 
-    logger.info(f"[TA-Lib] 计算 {inst_id} Bollinger Bands({period},{std_dev})")
+    logger.info(f"[TA] 计算 {inst_id} Bollinger Bands({period},{std_dev})")
 
-    closes = to_numpy_array([c["close"] for c in candles])
+    closes = to_pandas_series([c["close"] for c in candles])
 
-    # 计算布林带
-    upper, middle, lower = talib.BBANDS(
-        closes,
-        timeperiod=period,
-        nbdevup=std_dev,
-        nbdevdn=std_dev,
-        matype=0,  # SMA
-    )
+    middle = closes.rolling(window=period, min_periods=period).mean()
+    std = closes.rolling(window=period, min_periods=period).std()
+    upper = middle + (std * std_dev)
+    lower = middle - (std * std_dev)
 
-    current_price = closes[-1]
-    current_upper = upper[-1]
-    current_middle = middle[-1]
-    current_lower = lower[-1]
+    current_price = closes.iloc[-1]
+    current_upper = upper.iloc[-1]
+    current_middle = middle.iloc[-1]
+    current_lower = lower.iloc[-1]
 
-    # 计算带宽和%位置
     if not np.isnan(current_upper) and not np.isnan(current_lower):
         bandwidth = ((current_upper - current_lower) / current_middle) * 100
-        pct_position = (
-            (current_price - current_lower) / (current_upper - current_lower)
-        ) * 100
+        pct_position = ((current_price - current_lower) / (current_upper - current_lower)) * 100
     else:
         bandwidth = None
         pct_position = None
 
-    # 确定信号
     if np.isnan(current_upper):
         signal = "insufficient_data"
     elif current_price > current_upper:
-        signal = "upper_breakout"  # 突破上轨
+        signal = "upper_breakout"
     elif current_price < current_lower:
-        signal = "lower_breakout"  # 突破下轨
+        signal = "lower_breakout"
     else:
         signal = "within_band"
 
     output = {
         "inst_id": inst_id,
-        "upper": round(float(current_upper), 2)
-        if not np.isnan(current_upper)
-        else None,
-        "middle": round(float(current_middle), 2)
-        if not np.isnan(current_middle)
-        else None,
-        "lower": round(float(current_lower), 2)
-        if not np.isnan(current_lower)
-        else None,
+        "upper": round(float(current_upper), 2) if not np.isnan(current_upper) else None,
+        "middle": round(float(current_middle), 2) if not np.isnan(current_middle) else None,
+        "lower": round(float(current_lower), 2) if not np.isnan(current_lower) else None,
         "current_price": round(float(current_price), 2),
         "bandwidth_pct": round(float(bandwidth), 2) if bandwidth else None,
         "percent_position": round(float(pct_position), 2) if pct_position else None,
         "signal": signal,
-        "interpretation": _interpret_bollinger(
-            current_price, current_upper, current_lower, signal, bandwidth
-        ),
+        "interpretation": _interpret_bollinger(current_price, current_upper, current_lower, signal, bandwidth),
     }
 
-    logger.info(
-        f"[TA-Lib] Bollinger: Upper={output['upper']}, Lower={output['lower']}, Signal={signal}"
+    logger.info(f"[TA] Bollinger: Upper={output['upper']}, Lower={output['lower']}, Signal={signal}")
+
+    return NodeOutput(
+        success=True,
+        node_id=node_id,
+        node_type="bollinger",
+        data=output,
+        timestamp=timestamp
     )
 
-    return output
 
-
-def _interpret_bollinger(
-    price: float, upper: float, lower: float, signal: str, bandwidth: float
-) -> str:
+def _interpret_bollinger(price: float, upper: float, lower: float, signal: str, bandwidth: float) -> str:
     """解读布林带"""
     if np.isnan(upper):
         return "数据不足"
@@ -274,42 +382,65 @@ def _interpret_bollinger(
     return interpretations.get(signal, "未知信号")
 
 
-async def execute_ma(node: Dict, context: ExecutionContext) -> Any:
-    """移动平均线节点 - 真实计算"""
-    config = node.get("config", {})
+async def _execute_ma(
+    node_id: str,
+    inputs: Dict[str, NodeOutput],
+    config: Dict,
+    context: ExecutionContext,
+    timestamp: float
+) -> NodeOutput:
+    """移动平均线节点"""
     inst_id = config.get("inst_id", "BTC-USDT")
     period = config.get("period", 20)
-    ma_type = config.get("ma_type", "SMA")  # SMA, EMA, WMA
-    bar = config.get("bar", "1H")
+    ma_type = config.get("ma_type", "SMA")
 
-    candles_key = f"{inst_id}_candles_{bar}"
-    candles = context.variables.get(candles_key)
+    if not inputs:
+        return NodeOutput(
+            success=False,
+            node_id=node_id,
+            node_type="ma",
+            data={},
+            timestamp=timestamp,
+            error="MA节点需要输入K线数据"
+        )
+
+    candles_output = list(inputs.values())[0]
+    candles = candles_output.data.get("candles", [])
+    inst_id = candles_output.data.get("inst_id", inst_id)
 
     if not candles:
-        raise Exception(f"未找到 {inst_id} 的K线数据")
+        return NodeOutput(
+            success=False,
+            node_id=node_id,
+            node_type="ma",
+            data={},
+            timestamp=timestamp,
+            error=f"未找到 {inst_id} 的K线数据"
+        )
 
-    logger.info(f"[TA-Lib] 计算 {inst_id} {ma_type}({period})")
+    logger.info(f"[TA] 计算 {inst_id} {ma_type}({period})")
 
-    closes = to_numpy_array([c["close"] for c in candles])
+    closes = to_pandas_series([c["close"] for c in candles])
 
-    # 根据类型计算均线
     if ma_type == "SMA":
-        ma_values = talib.SMA(closes, timeperiod=period)
+        ma_values = closes.rolling(window=period, min_periods=period).mean()
     elif ma_type == "EMA":
-        ma_values = talib.EMA(closes, timeperiod=period)
+        ma_values = _calc_ema(closes, period)
     elif ma_type == "WMA":
-        ma_values = talib.WMA(closes, timeperiod=period)
+        weights = np.arange(1, period + 1)
+        ma_values = closes.rolling(window=period, min_periods=period).apply(
+            lambda x: np.dot(x, weights) / weights.sum(), raw=True
+        )
     else:
-        ma_values = talib.SMA(closes, timeperiod=period)
+        ma_values = closes.rolling(window=period, min_periods=period).mean()
 
-    current_ma = ma_values[-1]
-    current_price = closes[-1]
+    current_ma = ma_values.iloc[-1]
+    current_price = closes.iloc[-1]
 
-    # 判断趋势
     if np.isnan(current_ma):
         trend = "insufficient_data"
     elif current_price > current_ma:
-        trend = "above"  # 价格在均线上方
+        trend = "above"
     else:
         trend = "below"
 
@@ -321,12 +452,15 @@ async def execute_ma(node: Dict, context: ExecutionContext) -> Any:
         "current_price": round(float(current_price), 2),
         "trend": trend,
         "diff_pct": round((current_price - current_ma) / current_ma * 100, 2)
-        if not np.isnan(current_ma)
-        else None,
+        if not np.isnan(current_ma) else None,
     }
 
-    logger.info(
-        f"[TA-Lib] {ma_type}: {output['ma_value']}, Price: {output['current_price']}"
-    )
+    logger.info(f"[TA] {ma_type}: {output['ma_value']}, Price: {output['current_price']}")
 
-    return output
+    return NodeOutput(
+        success=True,
+        node_id=node_id,
+        node_type="ma",
+        data=output,
+        timestamp=timestamp
+    )

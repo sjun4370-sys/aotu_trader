@@ -1,21 +1,48 @@
-## 习惯
-编写临时工具脚本之后，使用完后必须删除
+## 技术栈
 
-## 服务命名
+- 后端: FastAPI + SQLAlchemy + SQLite
+- 前端: React 19 + TypeScript + Vite + Tauri
+- 指标: pandas / numpy（无 TA-Lib）
+- AI: Claude ( Anthropic ) / GPT ( OpenAI )
 
-- 后端服务: `backend/`
-- 前端服务: `frontend/`
+## 快速启动
+
+```bash
+# 后端
+cd backend && pip install -r requirements.txt && uvicorn api.main:app --reload --port 8000
+
+# 前端
+cd frontend && npm install && npm run tauri dev
+
+# 测试
+cd frontend && npm test
+```
+
+## 项目约定
+
+- 临时工具脚本用完必须删除
+- API 密钥放 `.env`，不硬编码
+- 后端入口: `backend/api/main.py`
+- 前端入口: `frontend/src/`
 
 ## API 规范
 
-**所有提供给前端的 API 接口必须写在 `backend/api/` 模块中**
+所有前端 API 写在 `backend/api/` 模块，Pydantic 模型在 `api/schemas/`，业务逻辑在 `services/` 层
 
-Pydantic 请求/响应模型必须放在 `api/schemas/` 目录
+## 节点执行器规范
 
-业务逻辑应封装在 `services/` 层，API 路由调用 services
+所有节点执行器统一签名：
 
-## 项目规则
+```python
+async def execute_node(
+    node_id: str,
+    node_type: str,
+    inputs: Dict[str, NodeOutput],  # 前置节点输出
+    config: Dict,
+    context: ExecutionContext
+) -> NodeOutput:
+```
 
-- API 密钥等敏感信息必须放在 `.env` 文件中，不要硬编码
+外层统一用 `engine/node_output.py` 的 `NodeOutput` dataclass 包装。
 
-> 项目介绍、技术栈、配置管理等详细资料请查看 [README.md](README.md)
+> 详细项目资料见 [README.md](README.md)

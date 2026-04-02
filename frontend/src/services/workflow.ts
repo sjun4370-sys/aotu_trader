@@ -4,10 +4,9 @@
 
 import type {
   Workflow,
-  WorkflowListItem,
   CreateWorkflowRequest,
   UpdateWorkflowRequest,
-  WorkflowListResponse,
+  WorkflowListApiResponse,
   RunWorkflowResponse,
   StopWorkflowResponse,
   WorkflowFilterParams,
@@ -42,16 +41,16 @@ async function request<T>(
  */
 export async function getWorkflows(
   params?: WorkflowFilterParams
-): Promise<WorkflowListResponse> {
+): Promise<WorkflowListApiResponse> {
   const searchParams = new URLSearchParams()
-  
+
   if (params?.page) searchParams.set('page', String(params.page))
   if (params?.page_size) searchParams.set('page_size', String(params.page_size))
   if (params?.status) searchParams.set('status', params.status)
   if (params?.search) searchParams.set('search', params.search)
 
   const query = searchParams.toString()
-  return request<WorkflowListResponse>(`/workflow/?${query}`)
+  return request<WorkflowListApiResponse>(`/workflow/?${query}`)
 }
 
 /**
@@ -67,7 +66,7 @@ export async function getWorkflow(id: string): Promise<Workflow> {
 export async function createWorkflow(
   data: CreateWorkflowRequest
 ): Promise<Workflow> {
-  return request<Workflow>('/workflow/save', {
+  return request<Workflow>('/workflow/', {
     method: 'POST',
     body: JSON.stringify(data),
   })

@@ -2,11 +2,15 @@
 风险控制节点 - 真实风控逻辑
 """
 
+from __future__ import annotations
+
 import logging
+import time
 from typing import Any, Dict
 from decimal import Decimal
 
-from engine.workflow_engine import ExecutionContext
+from engine.context import ExecutionContext
+from engine.node_output import NodeOutput
 
 logger = logging.getLogger(__name__)
 
@@ -29,15 +33,85 @@ def set_risk_config(max_loss_pct: float = 0.05, max_position_pct: float = 0.3):
     )
 
 
-async def execute_risk_check(node: Dict, context: ExecutionContext) -> Any:
+async def execute_node(
+    node_id: str,
+    node_type: str,
+    inputs: Dict[str, NodeOutput],
+    config: Dict,
+    context: ExecutionContext
+) -> NodeOutput:
+    """风险节点执行器入口"""
+    timestamp = time.time()
+
+    if node_type == "risk_check":
+        return await _execute_risk_check(node_id, config, inputs, context, timestamp)
+    elif node_type == "stop_loss":
+        return await _execute_stop_loss(node_id, config, inputs, context, timestamp)
+    elif node_type == "take_profit":
+        return await _execute_take_profit(node_id, config, inputs, context, timestamp)
+    elif node_type == "position_sizing":
+        return await _execute_position_sizing(node_id, config, inputs, context, timestamp)
+    else:
+        return NodeOutput(
+            success=False,
+            node_id=node_id,
+            node_type=node_type,
+            data={},
+            timestamp=timestamp,
+            error=f"Unknown node type: {node_type}"
+        )
+
+
+async def _execute_risk_check(
+    node_id: str,
+    config: Dict,
+    inputs: Dict[str, NodeOutput],
+    context: ExecutionContext,
+    timestamp: float
+) -> NodeOutput:
     """
     风险控制检查节点 - 综合风控检查
     """
-    config = node.get("config", {})
-    signal = context.variables.get("trading_signal", {})
+    # 从inputs迭代收集上游节点数据
+    signal = {}
+    account_balance = {}
+    positions = {}
+
+    for src_id, src_output in inputs.items():
+        if not src_output or not src_output.data:
+            continue
+        node_type = src_output.node_type
+        data = src_output.data
+        if node_type == "signal_generator":
+            signal = data
+        elif node_type == "okx_account":
+            account_balance = data
+        elif node_type == "okx_positions":
+            positions = data
+        elif node_type == "okx_ticker":
+            pass
+
+    # 兼容context.variables旧写法
+    if not signal:
+        signal = context.variables.get("trading_signal", {})
+    if not account_balance:
+        account_balance = context.variables.get("account_balance", {})
+    if not positions:
+        positions = context.variables.get("positions", {})
+
+    # 将inputs数据同步到context.variables，供内部check函数使用
+    context.variables["account_balance"] = account_balance
+    context.variables["positions"] = positions
 
     if not signal:
-        return {"approved": False, "reason": "未找到交易信号", "checks": []}
+        output = {"approved": False, "reason": "未找到交易信号", "checks": []}
+        return NodeOutput(
+            success=True,
+            node_id=node_id,
+            node_type="risk_check",
+            data=output,
+            timestamp=timestamp
+        )
 
     logger.info("[Risk] 开始风控检查")
 
@@ -90,7 +164,13 @@ async def execute_risk_check(node: Dict, context: ExecutionContext) -> Any:
     else:
         logger.warning(f"[Risk] 风控检查未通过: {output['reason']}")
 
-    return output
+    return NodeOutput(
+        success=True,
+        node_id=node_id,
+        node_type="risk_check",
+        data=output,
+        timestamp=timestamp
+    )
 
 
 async def _check_max_loss(context: ExecutionContext) -> Dict:
@@ -126,10 +206,11 @@ async def _check_max_position(context: ExecutionContext, signal: Dict) -> Dict:
 
     # 计算当前持仓价值
     for pos in positions.get("positions", []):
-        if pos.get("pos"):
-            current_positions_value += abs(Decimal(str(pos.get("pos", 0)))) * Decimal(
-                str(pos.get("mark_px", 0) or 0)
-            )
+        # 兼容不同来源的字段名：okx_data_nodes 用 pos_size，trade_nodes 用 pos
+        pos_value = pos.get("pos_size") or pos.get("pos")
+        mark_px = pos.get("mark_px") or 0
+        if pos_value:
+            current_positions_value += abs(Decimal(str(pos_value))) * Decimal(str(mark_px))
 
     # 计算新订单价值
     new_order_value = Decimal(str(signal.get("qty", 0))) * Decimal(
@@ -190,8 +271,6 @@ async def _check_min_order_value(signal: Dict) -> Dict:
 
 async def _check_cooldown(context: ExecutionContext, signal: Dict) -> Dict:
     """检查交易冷却时间（避免过度交易）"""
-    import time
-
     last_trade_time = context.variables.get("last_trade_time", 0)
     current_time = int(time.time())
 
@@ -221,19 +300,50 @@ def _calculate_risk_level(checks: list) -> str:
         return "low"
 
 
-async def execute_stop_loss(node: Dict, context: ExecutionContext) -> Any:
+async def _execute_stop_loss(
+    node_id: str,
+    config: Dict,
+    inputs: Dict[str, NodeOutput],
+    context: ExecutionContext,
+    timestamp: float
+) -> NodeOutput:
     """
     止损检查节点
     """
-    config = node.get("config", {})
     inst_id = config.get("inst_id")
     stop_loss_pct = Decimal(str(config.get("stop_loss_pct", 0.02)))  # 默认2%
 
-    positions = context.variables.get("positions", {})
-    current_price = context.variables.get(f"{inst_id}_price", 0)
+    # 从inputs迭代收集上游节点数据
+    positions = {}
+    ticker = {}
+
+    for src_id, src_output in inputs.items():
+        if not src_output or not src_output.data:
+            continue
+        node_type = src_output.node_type
+        data = src_output.data
+        if node_type == "okx_positions":
+            positions = data
+        elif node_type == "okx_ticker":
+            ticker = data
+
+    # 兼容context.variables旧写法
+    if not positions:
+        positions = context.variables.get("positions", {})
+    if not ticker:
+        ticker = context.variables.get("ticker", {})
+
+    current_price = ticker.get("last", context.variables.get(f"{inst_id}_price", 0))
 
     if not current_price or not positions:
-        return {"triggered": False, "reason": "无持仓或无价格数据"}
+        output = {"triggered": False, "reason": "无持仓或无价格数据"}
+        return NodeOutput(
+            success=True,
+            node_id=node_id,
+            node_type="stop_loss",
+            data=output,
+            timestamp=timestamp
+        )
 
     # 查找对应持仓
     target_position = None
@@ -243,13 +353,27 @@ async def execute_stop_loss(node: Dict, context: ExecutionContext) -> Any:
             break
 
     if not target_position:
-        return {"triggered": False, "reason": "未找到持仓"}
+        output = {"triggered": False, "reason": "未找到持仓"}
+        return NodeOutput(
+            success=True,
+            node_id=node_id,
+            node_type="stop_loss",
+            data=output,
+            timestamp=timestamp
+        )
 
     entry_price = Decimal(str(target_position.get("avg_px", 0)))
     pos_side = target_position.get("pos_side")
 
     if not entry_price or not pos_side:
-        return {"triggered": False, "reason": "持仓数据不完整"}
+        output = {"triggered": False, "reason": "持仓数据不完整"}
+        return NodeOutput(
+            success=True,
+            node_id=node_id,
+            node_type="stop_loss",
+            data=output,
+            timestamp=timestamp
+        )
 
     current_price = Decimal(str(current_price))
 
@@ -275,22 +399,59 @@ async def execute_stop_loss(node: Dict, context: ExecutionContext) -> Any:
     }
 
     logger.info(f"[Risk] 止损检查: {inst_id} - {output['reason']}")
-    return output
+    return NodeOutput(
+        success=True,
+        node_id=node_id,
+        node_type="stop_loss",
+        data=output,
+        timestamp=timestamp
+    )
 
 
-async def execute_take_profit(node: Dict, context: ExecutionContext) -> Any:
+async def _execute_take_profit(
+    node_id: str,
+    config: Dict,
+    inputs: Dict[str, NodeOutput],
+    context: ExecutionContext,
+    timestamp: float
+) -> NodeOutput:
     """
     止盈检查节点
     """
-    config = node.get("config", {})
     inst_id = config.get("inst_id")
     take_profit_pct = Decimal(str(config.get("take_profit_pct", 0.05)))  # 默认5%
 
-    positions = context.variables.get("positions", {})
-    current_price = context.variables.get(f"{inst_id}_price", 0)
+    # 从inputs迭代收集上游节点数据
+    positions = {}
+    ticker = {}
+
+    for src_id, src_output in inputs.items():
+        if not src_output or not src_output.data:
+            continue
+        node_type = src_output.node_type
+        data = src_output.data
+        if node_type == "okx_positions":
+            positions = data
+        elif node_type == "okx_ticker":
+            ticker = data
+
+    # 兼容context.variables旧写法
+    if not positions:
+        positions = context.variables.get("positions", {})
+    if not ticker:
+        ticker = context.variables.get("ticker", {})
+
+    current_price = ticker.get("last", context.variables.get(f"{inst_id}_price", 0))
 
     if not current_price or not positions:
-        return {"triggered": False, "reason": "无持仓或无价格数据"}
+        output = {"triggered": False, "reason": "无持仓或无价格数据"}
+        return NodeOutput(
+            success=True,
+            node_id=node_id,
+            node_type="take_profit",
+            data=output,
+            timestamp=timestamp
+        )
 
     target_position = None
     for pos in positions.get("positions", []):
@@ -299,13 +460,27 @@ async def execute_take_profit(node: Dict, context: ExecutionContext) -> Any:
             break
 
     if not target_position:
-        return {"triggered": False, "reason": "未找到持仓"}
+        output = {"triggered": False, "reason": "未找到持仓"}
+        return NodeOutput(
+            success=True,
+            node_id=node_id,
+            node_type="take_profit",
+            data=output,
+            timestamp=timestamp
+        )
 
     entry_price = Decimal(str(target_position.get("avg_px", 0)))
     pos_side = target_position.get("pos_side")
 
     if not entry_price or not pos_side:
-        return {"triggered": False, "reason": "持仓数据不完整"}
+        output = {"triggered": False, "reason": "持仓数据不完整"}
+        return NodeOutput(
+            success=True,
+            node_id=node_id,
+            node_type="take_profit",
+            data=output,
+            timestamp=timestamp
+        )
 
     current_price = Decimal(str(current_price))
 
@@ -331,24 +506,63 @@ async def execute_take_profit(node: Dict, context: ExecutionContext) -> Any:
     }
 
     logger.info(f"[Risk] 止盈检查: {inst_id} - {output['reason']}")
-    return output
+    return NodeOutput(
+        success=True,
+        node_id=node_id,
+        node_type="take_profit",
+        data=output,
+        timestamp=timestamp
+    )
 
 
-async def execute_position_sizing(node: Dict, context: ExecutionContext) -> Any:
+async def _execute_position_sizing(
+    node_id: str,
+    config: Dict,
+    inputs: Dict[str, NodeOutput],
+    context: ExecutionContext,
+    timestamp: float
+) -> NodeOutput:
     """
     仓位计算节点
     """
-    config = node.get("config", {})
+    # 从inputs迭代收集上游节点数据
+    account = {}
+    signal = {}
+    ticker = {}
 
-    account = context.variables.get("account_balance", {})
-    signal = context.variables.get("trading_signal", {})
+    for src_id, src_output in inputs.items():
+        if not src_output or not src_output.data:
+            continue
+        node_type = src_output.node_type
+        data = src_output.data
+        if node_type == "okx_account":
+            account = data
+        elif node_type == "signal_generator":
+            signal = data
+        elif node_type == "okx_ticker":
+            ticker = data
+
+    # 兼容context.variables旧写法
+    if not account:
+        account = context.variables.get("account_balance", {})
+    if not signal:
+        signal = context.variables.get("trading_signal", {})
+    if not ticker:
+        ticker = context.variables.get("ticker", {})
+
     risk_level = signal.get("risk_level", "medium")
-
     total_equity = Decimal(str(account.get("total_equity", 0)))
-    current_price = Decimal(str(context.variables.get("price", 0)))
+    current_price = Decimal(str(ticker.get("last", context.variables.get("price", 0))))
 
     if total_equity <= 0 or current_price <= 0:
-        return {"success": False, "error": "账户余额或价格数据无效"}
+        return NodeOutput(
+            success=False,
+            node_id=node_id,
+            node_type="position_sizing",
+            data={},
+            timestamp=timestamp,
+            error="账户余额或价格数据无效"
+        )
 
     # 根据风险等级调整仓位
     risk_multipliers = {
@@ -378,4 +592,10 @@ async def execute_position_sizing(node: Dict, context: ExecutionContext) -> Any:
     }
 
     logger.info(f"[Risk] 仓位计算: {output['qty']} (风险等级: {risk_level})")
-    return output
+    return NodeOutput(
+        success=True,
+        node_id=node_id,
+        node_type="position_sizing",
+        data=output,
+        timestamp=timestamp
+    )

@@ -30,14 +30,14 @@ export default function StartDataViewer({ data, isInferred }: Props) {
             {String(data.executionId || '-')}
           </span>
         </div>
-        {data.schedule && (
+        {data.schedule ? (
           <div className={styles.infoItem}>
             <span className={styles.infoLabel}>定时表达式</span>
             <span className={styles.infoValue} style={{ fontFamily: 'monospace' }}>
               {String(data.schedule)}
             </span>
           </div>
-        )}
+        ) : null}
       </div>
     </BaseDataViewer>
   )

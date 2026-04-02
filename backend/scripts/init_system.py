@@ -9,7 +9,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config.system_config import system_config
-from engine.workflow_engine_v2 import workflow_engine
+from engine.workflow_engine import workflow_engine
 from okx_api.config import OKXConfig
 
 

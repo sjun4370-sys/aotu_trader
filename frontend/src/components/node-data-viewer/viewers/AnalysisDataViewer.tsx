@@ -16,11 +16,11 @@ export default function AnalysisDataViewer({ data, isInferred }: Props) {
         </div>
       </div>
 
-      {data.analysis && (
+      {data.analysis ? (
         <div className={styles.analysisText}>
           {String(data.analysis)}
         </div>
-      )}
+      ) : null}
     </BaseDataViewer>
   )
 }

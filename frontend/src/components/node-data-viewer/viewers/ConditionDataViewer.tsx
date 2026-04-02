@@ -18,14 +18,14 @@ export default function ConditionDataViewer({ data, isInferred }: Props) {
             {result ? '✅ 条件成立' : '❌ 条件不成立'}
           </span>
         </div>
-        {data.matchedCondition && (
+        {data.matchedCondition ? (
           <div className={styles.infoItem}>
             <span className={styles.infoLabel}>条件表达式</span>
             <span className={styles.infoValue} style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
               {String(data.matchedCondition)}
             </span>
           </div>
-        )}
+        ) : null}
       </div>
     </BaseDataViewer>
   )

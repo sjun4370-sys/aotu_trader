@@ -2,21 +2,21 @@
 AI分析节点执行器 - 真实调用LLM API
 """
 
+from __future__ import annotations
+
 import logging
 import json
+import time
 from typing import Any, Dict
 from decimal import Decimal
 
 import anthropic
 from openai import OpenAI
 
-from engine.workflow_engine import ExecutionContext
+from engine.context import ExecutionContext
+from engine.node_output import NodeOutput
 
 logger = logging.getLogger(__name__)
-
-# API配置
-ANTHROPIC_API_KEY = "YOUR_ANTHROPIC_API_KEY"  # 从环境变量读取
-OPENAI_API_KEY = "YOUR_OPENAI_API_KEY"
 
 # 初始化客户端
 claude_client = None
@@ -27,10 +27,10 @@ def init_llm_clients():
     """初始化LLM客户端"""
     global claude_client, openai_client
 
-    import os
+    from config.system_config import system_config
 
-    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-    openai_key = os.getenv("OPENAI_API_KEY")
+    anthropic_key = system_config.anthropic_api_key
+    openai_key = system_config.openai_api_key
 
     if anthropic_key:
         claude_client = anthropic.Anthropic(api_key=anthropic_key)
@@ -41,20 +41,80 @@ def init_llm_clients():
         logger.info("OpenAI客户端已初始化")
 
 
-async def execute_llm_analysis(node: Dict, context: ExecutionContext) -> Any:
+async def execute_node(
+    node_id: str,
+    node_type: str,
+    inputs: Dict[str, NodeOutput],
+    config: Dict,
+    context: ExecutionContext
+) -> NodeOutput:
+    """AI节点执行器入口"""
+    timestamp = time.time()
+
+    if node_type == "llm_analysis":
+        return await _execute_llm_analysis(node_id, config, inputs, context, timestamp)
+    elif node_type == "signal_generator":
+        return await _execute_signal_generator(node_id, config, inputs, context, timestamp)
+    else:
+        return NodeOutput(
+            success=False,
+            node_id=node_id,
+            node_type=node_type,
+            data={},
+            timestamp=timestamp,
+            error=f"Unknown node type: {node_type}"
+        )
+
+
+async def _execute_llm_analysis(
+    node_id: str,
+    config: Dict,
+    inputs: Dict[str, NodeOutput],
+    context: ExecutionContext,
+    timestamp: float
+) -> NodeOutput:
     """
     LLM市场分析节点 - 真实调用Claude API
     综合分析市场数据、技术指标，给出交易建议
     """
-    config = node.get("config", {})
     provider = config.get("provider", "claude")  # claude 或 openai
     model = config.get("model", "claude-3-sonnet-20240229")
 
-    # 从上下文获取数据
-    ticker = context.variables.get("ticker", {})
-    candles = context.variables.get("candles", [])
-    rsi = context.variables.get("rsi", None)
-    macd = context.variables.get("macd", {})
+    # 从inputs迭代收集上游节点数据
+    ticker = {}
+    candles = []
+    rsi = None
+    macd = {}
+    bollinger = {}
+    ma = {}
+
+    for src_id, src_output in inputs.items():
+        if not src_output or not src_output.data:
+            continue
+        node_type = src_output.node_type
+        data = src_output.data
+        if node_type == "okx_ticker":
+            ticker = data
+        elif node_type == "okx_candles":
+            candles = data.get("candles", [])
+        elif node_type == "rsi":
+            rsi = data.get("rsi")
+        elif node_type == "macd":
+            macd = data
+        elif node_type == "bollinger":
+            bollinger = data
+        elif node_type == "ma":
+            ma = data
+
+    # 兼容context.variables旧写法
+    if not ticker:
+        ticker = context.variables.get("ticker", {})
+    if not candles:
+        candles = context.variables.get("candles", [])
+    if rsi is None:
+        rsi = context.variables.get("rsi")
+    if not macd:
+        macd = context.variables.get("macd", {})
 
     # 构建市场数据摘要
     market_summary = _build_market_summary(ticker, candles, rsi, macd)
@@ -64,12 +124,26 @@ async def execute_llm_analysis(node: Dict, context: ExecutionContext) -> Any:
     # 构建提示词
     prompt = _build_analysis_prompt(market_summary)
 
+    # 检查API配置
+    has_api_key = (provider == "claude" and claude_client) or (provider == "openai" and openai_client)
+
+    if not has_api_key:
+        return NodeOutput(
+            success=False,
+            node_id=node_id,
+            node_type="llm_analysis",
+            data={},
+            timestamp=timestamp,
+            error="LLM API not configured"
+        )
+
     try:
         if provider == "claude" and claude_client:
             response = claude_client.messages.create(
                 model=model,
                 max_tokens=2000,
                 messages=[{"role": "user", "content": prompt}],
+                timeout=30.0,
             )
             analysis_text = response.content[0].text
 
@@ -78,12 +152,9 @@ async def execute_llm_analysis(node: Dict, context: ExecutionContext) -> Any:
                 model=model or "gpt-4",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=2000,
+                timeout=30.0,
             )
             analysis_text = response.choices[0].message.content
-        else:
-            # 如果没有配置API密钥，返回模拟分析
-            analysis_text = _generate_mock_analysis(market_summary)
-            logger.warning("[LLM] 未配置API密钥，使用模拟分析")
 
         # 解析分析结果
         parsed_result = _parse_llm_response(analysis_text)
@@ -110,11 +181,24 @@ async def execute_llm_analysis(node: Dict, context: ExecutionContext) -> Any:
         logger.info(
             f"[LLM] 分析完成: {output['recommendation']} (置信度: {output['confidence']}%)"
         )
-        return output
+        return NodeOutput(
+            success=True,
+            node_id=node_id,
+            node_type="llm_analysis",
+            data=output,
+            timestamp=timestamp
+        )
 
     except Exception as e:
         logger.error(f"[LLM] 分析失败: {e}")
-        raise
+        return NodeOutput(
+            success=False,
+            node_id=node_id,
+            node_type="llm_analysis",
+            data={},
+            timestamp=timestamp,
+            error=str(e)
+        )
 
 
 def _build_market_summary(ticker: Dict, candles: list, rsi: Any, macd: Dict) -> Dict:
@@ -149,9 +233,9 @@ def _build_market_summary(ticker: Dict, candles: list, rsi: Any, macd: Dict) -> 
 
     # 计算短期趋势
     if candles and len(candles) >= 10:
-        recent = candles[:10]
+        recent = candles[-10:]
         closes = [float(c.get("close", 0)) for c in recent]
-        summary["short_term_trend"] = "up" if closes[0] > closes[-1] else "down"
+        summary["short_term_trend"] = "up" if closes[-1] > closes[0] else "down"
         summary["volatility"] = (
             (max(closes) - min(closes)) / sum(closes) * len(closes) * 100
             if closes
@@ -182,13 +266,13 @@ def _build_analysis_prompt(market_summary: Dict) -> str:
 - MACD信号: {market_summary.get("macd", {}).get("signal", "N/A")}
 - MACD交叉: {market_summary.get("macd", {}).get("crossover", "N/A")}
 - 短期趋势: {market_summary.get("short_term_trend", "N/A")}
-- 波动率: {market_summary.get("volatility", "N/A"):.2f}%
+- 波动率: {market_summary.get("volatility", 0):.2f}%
 
 ## 请提供以下分析
 
 1. **趋势判断**: 当前是上涨/下跌/震荡趋势？判断依据是什么？
 
-2. **技术指标解读**: 
+2. **技术指标解读**:
    - RSI指标的含义（超买/超卖/中性）
    - MACD指标的含义（金叉/死叉/趋势强度）
    - 其他技术指标的综合判断
@@ -272,53 +356,52 @@ def _parse_llm_response(text: str) -> Dict:
             "timeframe": "short_term",
         }
 
-
-def _generate_mock_analysis(market_summary: Dict) -> str:
-    """生成模拟分析（当没有API密钥时使用）"""
-    return json.dumps(
-        {
-            "sentiment": "neutral",
-            "trend": "sideways",
-            "recommendation": "HOLD",
-            "confidence": 50,
-            "reasoning": "未配置LLM API密钥，请设置ANTHROPIC_API_KEY或OPENAI_API_KEY环境变量",
-            "risk_level": "medium",
-            "key_levels": {
-                "support": [
-                    market_summary.get("current_price", 0) * 0.95,
-                    market_summary.get("current_price", 0) * 0.90,
-                ],
-                "resistance": [
-                    market_summary.get("current_price", 0) * 1.05,
-                    market_summary.get("current_price", 0) * 1.10,
-                ],
-            },
-            "timeframe": "short_term",
-        },
-        indent=2,
-    )
-
-
-async def execute_signal_generator(node: Dict, context: ExecutionContext) -> Any:
+async def _execute_signal_generator(
+    node_id: str,
+    config: Dict,
+    inputs: Dict[str, NodeOutput],
+    context: ExecutionContext,
+    timestamp: float
+) -> NodeOutput:
     """
     信号生成节点 - 综合AI分析和规则生成最终交易信号
     """
-    config = node.get("config", {})
     strategy_type = config.get(
         "strategy_type", "ai_assisted"
     )  # ai_assisted, rule_based, hybrid
 
-    # 获取AI分析结果
-    ai_analysis = context.variables.get("llm_analysis", {})
+    # 从inputs迭代收集上游节点数据
+    ai_analysis = {}
+    rsi = None
+    macd = {}
+    ticker = {}
+
+    for src_id, src_output in inputs.items():
+        if not src_output or not src_output.data:
+            continue
+        node_type = src_output.node_type
+        data = src_output.data
+        if node_type == "llm_analysis":
+            ai_analysis = data
+        elif node_type == "rsi":
+            rsi = data.get("rsi")
+        elif node_type == "macd":
+            macd = data
+        elif node_type == "okx_ticker":
+            ticker = data
+
+    # 兼容context.variables旧写法
+    if not ai_analysis:
+        ai_analysis = context.variables.get("llm_analysis", {})
+    if rsi is None:
+        rsi = context.variables.get("rsi")
+    if not macd:
+        macd = context.variables.get("macd", {})
+    if not ticker:
+        ticker = context.variables.get("ticker", {})
+
     ai_recommendation = ai_analysis.get("recommendation", "HOLD")
     ai_confidence = ai_analysis.get("confidence", 50)
-
-    # 获取技术指标
-    rsi = context.variables.get("rsi")
-    macd = context.variables.get("macd", {})
-
-    # 获取当前价格
-    ticker = context.variables.get("ticker", {})
     current_price = ticker.get("last", 0)
 
     # 综合判断
@@ -344,7 +427,13 @@ async def execute_signal_generator(node: Dict, context: ExecutionContext) -> Any
         f"[Signal] 生成信号: {output['signal']} (置信度: {output['confidence']}%)"
     )
 
-    return output
+    return NodeOutput(
+        success=True,
+        node_id=node_id,
+        node_type="signal_generator",
+        data=output,
+        timestamp=timestamp
+    )
 
 
 def _generate_trading_signal(
