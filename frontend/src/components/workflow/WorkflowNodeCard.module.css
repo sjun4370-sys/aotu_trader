@@ -10,11 +10,15 @@
   overflow: visible;
 }
 
-.card[data-category='trigger']  { --node-accent: var(--wf-node-trigger); }
-.card[data-category='currency'] { --node-accent: var(--wf-node-currency); }
+.card[data-category='trigger']   { --node-accent: var(--wf-node-trigger); }
+.card[data-category='currency']  { --node-accent: var(--wf-node-currency); }
 .card[data-category='data']     { --node-accent: var(--wf-node-data); }
-.card[data-category='strategy'] { --node-accent: var(--wf-node-strategy); }
+.card[data-category='indicator'] { --node-accent: var(--wf-node-indicator); }
 .card[data-category='ai']       { --node-accent: var(--wf-node-ai); }
+.card[data-category='risk']     { --node-accent: var(--wf-node-risk); }
+.card[data-category='trade']    { --node-accent: var(--wf-node-trade); }
+.card[data-category='logic']    { --node-accent: var(--wf-node-logic); }
+.card[data-category='strategy'] { --node-accent: var(--wf-node-strategy); }
 .card[data-category='tool']     { --node-accent: var(--wf-node-tool); }
 
 .card[data-status='disabled'] {

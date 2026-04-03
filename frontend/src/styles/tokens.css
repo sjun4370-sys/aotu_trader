@@ -5,10 +5,14 @@
   --wf-text: #0f172a;
   --wf-muted: #65748a;
   --wf-node-trigger: #22c55e;
-  --wf-node-currency: #0ea5a9;
+  --wf-node-currency: #f59e0b;
   --wf-node-data: #38bdf8;
-  --wf-node-strategy: #a855f7;
+  --wf-node-indicator: #a855f7;
   --wf-node-ai: #fb7185;
+  --wf-node-risk: #f59e0b;
+  --wf-node-trade: #10b981;
+  --wf-node-logic: #a855f7;
+  --wf-node-strategy: #a855f7;
   --wf-node-tool: #f59e0b;
   --wf-primary: #6366f1;
   --wf-error: #ef4444;

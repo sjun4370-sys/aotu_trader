@@ -1,20 +1,8 @@
 import { useMemo, useState } from 'react'
-import type { WorkflowConnectionDraft, WorkflowEdge, WorkflowNode, WorkflowNodeCategory } from '../../types/workflow'
+import type { WorkflowConnectionDraft, WorkflowEdge, WorkflowNode } from '../../types/workflow'
+import { CATEGORY_EDGE_COLORS } from '../../config/workflow-colors'
 import { getPortPoint } from '../../utils/workflow'
 import styles from './EdgeLayer.module.css'
-
-const CATEGORY_COLORS: Record<WorkflowNodeCategory, string> = {
-  trigger: '#22c55e',
-  currency: '#0ea5a9',
-  data: '#38bdf8',
-  indicator: '#0ea5e9',
-  strategy: '#a855f7',
-  ai: '#fb7185',
-  tool: '#f59e0b',
-  risk: '#f59e0b',
-  logic: '#a855f7',
-  trade: '#10b981'
-}
 
 interface EdgeLayerProps {
   edges: WorkflowEdge[]
@@ -176,8 +164,8 @@ export default function EdgeLayer({
         edge,
         id: edge.id,
         pathD: buildBezierPath(startPos.x, startPos.y, endPos.x, endPos.y),
-        fromColor: isDisabled ? '#94a3b8' : CATEGORY_COLORS[fromNode.category],
-        toColor: isDisabled ? '#cbd5e1' : CATEGORY_COLORS[toNode.category],
+        fromColor: isDisabled ? '#94a3b8' : CATEGORY_EDGE_COLORS[fromNode.category],
+        toColor: isDisabled ? '#cbd5e1' : CATEGORY_EDGE_COLORS[toNode.category],
         isConnectedToSelection:
           selectedNodeIdSet.has(edge.fromNodeId) || selectedNodeIdSet.has(edge.toNodeId),
         isDisabled,
@@ -201,7 +189,7 @@ export default function EdgeLayer({
       return null
     }
 
-    const fromColor = CATEGORY_COLORS[fromNode.category]
+    const fromColor = CATEGORY_EDGE_COLORS[fromNode.category]
 
     return {
       edge: null,

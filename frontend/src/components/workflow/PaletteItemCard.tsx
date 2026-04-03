@@ -7,8 +7,12 @@ const CATEGORY_COLORS: Record<string, string> = {
   trigger: 'var(--wf-node-trigger)',
   currency: 'var(--wf-node-currency)',
   data: 'var(--wf-node-data)',
-  strategy: 'var(--wf-node-strategy)',
+  indicator: 'var(--wf-node-indicator)',
   ai: 'var(--wf-node-ai)',
+  risk: 'var(--wf-node-risk)',
+  trade: 'var(--wf-node-trade)',
+  logic: 'var(--wf-node-logic)',
+  strategy: 'var(--wf-node-strategy)',
   tool: 'var(--wf-node-tool)'
 }
 
