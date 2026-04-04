@@ -30,15 +30,23 @@ def init_llm_clients():
     from config.system_config import system_config
 
     anthropic_key = system_config.anthropic_api_key
+    anthropic_base_url = getattr(system_config, 'anthropic_base_url', '') or None
     openai_key = system_config.openai_api_key
+    openai_base_url = getattr(system_config, 'openai_base_url', '') or None
 
     if anthropic_key:
-        claude_client = anthropic.Anthropic(api_key=anthropic_key)
-        logger.info("Claude客户端已初始化")
+        client_kwargs = {"api_key": anthropic_key}
+        if anthropic_base_url:
+            client_kwargs["base_url"] = anthropic_base_url
+        claude_client = anthropic.Anthropic(**client_kwargs)
+        logger.info(f"Claude客户端已初始化 (base_url: {anthropic_base_url})")
 
     if openai_key:
-        openai_client = OpenAI(api_key=openai_key)
-        logger.info("OpenAI客户端已初始化")
+        client_kwargs = {"api_key": openai_key}
+        if openai_base_url:
+            client_kwargs["base_url"] = openai_base_url
+        openai_client = OpenAI(**client_kwargs)
+        logger.info(f"OpenAI客户端已初始化 (base_url: {openai_base_url})")
 
 
 async def execute_node(
@@ -145,7 +153,15 @@ async def _execute_llm_analysis(
                 messages=[{"role": "user", "content": prompt}],
                 timeout=30.0,
             )
-            analysis_text = response.content[0].text
+            # 兼容处理：MiniMax 可能返回 ThinkingBlock 或 TextBlock
+            analysis_text = ""
+            for block in response.content:
+                if hasattr(block, 'text') and block.text:
+                    analysis_text = block.text
+                    break
+            if not analysis_text:
+                # 如果没有 text 属性，尝试转为字符串
+                analysis_text = str(response.content[0])
 
         elif provider == "openai" and openai_client:
             response = openai_client.chat.completions.create(

@@ -46,7 +46,9 @@ def initialize_system():
     try:
         okx_config = system_config.to_okx_config()
         workflow_engine.initialize_apis(
-            okx_config=okx_config, llm_config={"provider": system_config.llm_provider}
+            okx_config=okx_config,
+            llm_config={"provider": system_config.llm_provider},
+            proxy=system_config.https_proxy if system_config.https_proxy else None,
         )
         print("✅ OKX API初始化成功")
     except Exception as e:

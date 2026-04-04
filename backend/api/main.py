@@ -21,6 +21,7 @@ async def lifespan(app: FastAPI):
         workflow_engine.initialize_apis(
             okx_config=okx_config,
             llm_config={"api_key": system_config.anthropic_api_key} if system_config.has_llm_config() else None,
+            proxy=system_config.https_proxy if system_config.https_proxy else None,
         )
         print("[OKX API] 启动时初始化成功")
     else:

@@ -113,10 +113,10 @@ class WorkflowEngine:
 
         logger.info(f"[Engine] 注册了 {len(self._executors)} 个节点执行器")
 
-    def initialize_apis(self, okx_config=None, llm_config=None):
+    def initialize_apis(self, okx_config=None, llm_config=None, proxy=None):
         """初始化所有API连接"""
         if okx_config:
-            okx_manager.initialize(okx_config)
+            okx_manager.initialize(okx_config, proxy)
             init_trade_api(okx_config)
             logger.info("[Engine] OKX API已初始化")
 
@@ -284,7 +284,7 @@ class WorkflowEngine:
     ) -> NodeExecutionResult:
         """执行单个节点"""
         node_type = node.get("type", "unknown")
-        config = node.get("data", {})
+        config = node.get("config", {})
         start_time = datetime.now(timezone.utc)
 
         logger.info(f"[Engine] === 执行节点: {node_id} (类型: {node_type}) ===")

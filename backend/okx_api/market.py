@@ -11,13 +11,14 @@ from typing import Optional, Literal, Any
 class MarketAPI:
     """OKX 市场数据 API"""
 
-    def __init__(self, flag: Literal["0", "1"] = "1"):
+    def __init__(self, flag: Literal["0", "1"] = "1", proxy: Optional[str] = None):
         """
         Args:
             flag: "0" = 实盘, "1" = 模拟盘
+            proxy: 代理地址，如 "http://127.0.0.1:7890"
         """
         self.flag = flag
-        self.market_api = MarketData.MarketAPI(flag=flag)
+        self.market_api = MarketData.MarketAPI(flag=flag, proxy=proxy)
         self.public_api = PublicData.PublicAPI(flag=flag)
 
     # ==================== MarketData API ====================

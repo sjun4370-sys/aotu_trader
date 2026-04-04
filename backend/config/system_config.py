@@ -32,11 +32,15 @@ class SystemConfig:
     okx_passphrase: str = ""
     okx_flag: str = "1"
     anthropic_api_key: str = ""
+    anthropic_base_url: str = ""
     openai_api_key: str = ""
+    openai_base_url: str = ""
     llm_provider: str = "anthropic"
     llm_model: str = "MiniMax-M2.7-highspeed"
     max_loss_pct: float = 0.05
     max_position_pct: float = 0.3
+    https_proxy: str = ""
+    http_proxy: str = ""
 
     @classmethod
     def from_env(cls):
@@ -46,11 +50,15 @@ class SystemConfig:
             okx_passphrase=_env.get("passphrase", ""),
             okx_flag=_env.get("flag", "1"),
             anthropic_api_key=_env.get("anthropic_api_key", ""),
+            anthropic_base_url=_env.get("anthropic_base_url", ""),
             openai_api_key=_env.get("openai_api_key", ""),
+            openai_base_url=_env.get("openai_base_url", ""),
             llm_provider=_env.get("llm_provider", "anthropic"),
             llm_model=_env.get("anthropic_model", "MiniMax-M2.7-highspeed"),
             max_loss_pct=float(_env.get("max_loss_pct", "0.05")),
             max_position_pct=float(_env.get("max_position_pct", "0.3")),
+            https_proxy=_env.get("https_proxy", ""),
+            http_proxy=_env.get("http_proxy", ""),
         )
 
     def is_configured(self):

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
+import logging
 from api.schemas.workflow import (
     WorkflowCreateRequest,
     WorkflowUpdateRequest,
@@ -17,7 +18,42 @@ from engine.workflow_engine import workflow_engine
 from engine.context import ExecutionContext
 from config.system_config import system_config
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(tags=["workflow"])
+
+
+@router.get("/currencies")
+async def get_currencies():
+    """获取 OKX 可用币种列表"""
+    from engine.node_executors.okx_data_nodes import okx_manager
+    from config.system_config import system_config
+
+    # 确保 OKX API 已初始化
+    if system_config.is_configured() and (not hasattr(okx_manager, '_market_api') or okx_manager._market_api is None):
+        okx_manager.initialize(system_config.to_okx_config())
+
+    try:
+        result = okx_manager.market.get_instruments(inst_type="SPOT")
+        success, data = okx_manager.market.parse_response(result)
+
+        if success and data:
+            currencies = []
+            for item in data:
+                inst_id = item.get("instId", "")
+                # 只返回 USDT 交易对的现货币种
+                if inst_id.endswith("-USDT") and item.get("state") == "live":
+                    currencies.append({
+                        "inst_id": inst_id,
+                        "base_currency": item.get("baseCcy", ""),
+                        "quote_currency": item.get("quoteCcy", ""),
+                    })
+            return {"success": True, "currencies": currencies, "count": len(currencies)}
+        else:
+            return {"success": False, "currencies": [], "count": 0, "error": str(data)}
+    except Exception as e:
+        logger.error(f"[Currency API] 获取币种列表失败: {e}")
+        return {"success": False, "currencies": [], "count": 0, "error": str(e)}
 
 
 @router.post("/", response_model=WorkflowResponse)
@@ -25,48 +61,6 @@ async def create_workflow(request: WorkflowCreateRequest, db: Session = Depends(
     """创建工作流"""
     service = WorkflowService(db)
     workflow = service.create_workflow(request)
-    return WorkflowResponse(
-        id=workflow.id,
-        name=workflow.name,
-        description=workflow.description,
-        status=workflow.status,
-        last_run_at=workflow.last_run_at,
-        trigger_mode=workflow.trigger_mode,
-        nodes=workflow.nodes,
-        edges=workflow.edges,
-        created_at=workflow.created_at,
-        updated_at=workflow.updated_at,
-    )
-
-
-@router.get("/{workflow_id}", response_model=WorkflowResponse)
-async def get_workflow(workflow_id: str, db: Session = Depends(get_db)):
-    service = WorkflowService(db)
-    workflow = service.get_workflow(workflow_id)
-    if not workflow:
-        raise HTTPException(status_code=404, detail="Workflow not found")
-    return WorkflowResponse(
-        id=workflow.id,
-        name=workflow.name,
-        description=workflow.description,
-        status=workflow.status,
-        last_run_at=workflow.last_run_at,
-        trigger_mode=workflow.trigger_mode,
-        nodes=workflow.nodes,
-        edges=workflow.edges,
-        created_at=workflow.created_at,
-        updated_at=workflow.updated_at,
-    )
-
-
-@router.put("/{workflow_id}", response_model=WorkflowResponse)
-async def update_workflow(
-    workflow_id: str, request: WorkflowUpdateRequest, db: Session = Depends(get_db)
-):
-    service = WorkflowService(db)
-    workflow = service.update_workflow(workflow_id, request)
-    if not workflow:
-        raise HTTPException(status_code=404, detail="Workflow not found")
     return WorkflowResponse(
         id=workflow.id,
         name=workflow.name,
@@ -114,6 +108,48 @@ async def list_workflows(
     )
 
 
+@router.get("/{workflow_id}", response_model=WorkflowResponse)
+async def get_workflow(workflow_id: str, db: Session = Depends(get_db)):
+    service = WorkflowService(db)
+    workflow = service.get_workflow(workflow_id)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    return WorkflowResponse(
+        id=workflow.id,
+        name=workflow.name,
+        description=workflow.description,
+        status=workflow.status,
+        last_run_at=workflow.last_run_at,
+        trigger_mode=workflow.trigger_mode,
+        nodes=workflow.nodes,
+        edges=workflow.edges,
+        created_at=workflow.created_at,
+        updated_at=workflow.updated_at,
+    )
+
+
+@router.put("/{workflow_id}", response_model=WorkflowResponse)
+async def update_workflow(
+    workflow_id: str, request: WorkflowUpdateRequest, db: Session = Depends(get_db)
+):
+    service = WorkflowService(db)
+    workflow = service.update_workflow(workflow_id, request)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    return WorkflowResponse(
+        id=workflow.id,
+        name=workflow.name,
+        description=workflow.description,
+        status=workflow.status,
+        last_run_at=workflow.last_run_at,
+        trigger_mode=workflow.trigger_mode,
+        nodes=workflow.nodes,
+        edges=workflow.edges,
+        created_at=workflow.created_at,
+        updated_at=workflow.updated_at,
+    )
+
+
 @router.delete("/{workflow_id}")
 async def delete_workflow(workflow_id: str, db: Session = Depends(get_db)):
     service = WorkflowService(db)
@@ -131,11 +167,24 @@ async def run_workflow(workflow_id: str, db: Session = Depends(get_db)):
     if not workflow:
         raise HTTPException(status_code=404, detail="Workflow not found")
 
+    # 设置代理（如果配置了）
+    if system_config.https_proxy:
+        import os
+        os.environ["HTTPS_PROXY"] = system_config.https_proxy
+        os.environ["https_proxy"] = system_config.https_proxy
+        logger.info(f"[Workflow] 已设置 HTTPS 代理: {system_config.https_proxy}")
+    if system_config.http_proxy:
+        import os
+        os.environ["HTTP_PROXY"] = system_config.http_proxy
+        os.environ["http_proxy"] = system_config.http_proxy
+        logger.info(f"[Workflow] 已设置 HTTP 代理: {system_config.http_proxy}")
+
     # 初始化 API
     if system_config.is_configured():
         workflow_engine.initialize_apis(
             okx_config=system_config.to_okx_config(),
-            llm_config={"api_key": system_config.anthropic_api_key} if system_config.has_llm_config() else None
+            llm_config={"api_key": system_config.anthropic_api_key} if system_config.has_llm_config() else None,
+            proxy=system_config.https_proxy if system_config.https_proxy else None
         )
 
     # 创建执行上下文

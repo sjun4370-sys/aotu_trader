@@ -111,3 +111,23 @@ export async function stopWorkflow(id: string): Promise<StopWorkflowResponse> {
     method: 'POST',
   })
 }
+
+/**
+ * 获取 OKX 可用币种列表
+ */
+export interface CurrencyInfo {
+  inst_id: string
+  base_currency: string
+  quote_currency: string
+}
+
+export interface GetCurrenciesResponse {
+  success: boolean
+  currencies: CurrencyInfo[]
+  count: number
+  error?: string
+}
+
+export async function getCurrencies(): Promise<GetCurrenciesResponse> {
+  return request<GetCurrenciesResponse>('/workflow/currencies')
+}

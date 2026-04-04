@@ -136,7 +136,8 @@ class WorkflowService:
         if system_config.is_configured():
             workflow_engine.initialize_apis(
                 okx_config=system_config.to_okx_config(),
-                llm_config={"api_key": system_config.anthropic_api_key} if system_config.has_llm_config() else None
+                llm_config={"api_key": system_config.anthropic_api_key} if system_config.has_llm_config() else None,
+                proxy=system_config.https_proxy if system_config.https_proxy else None
             )
 
         # 更新状态为运行中

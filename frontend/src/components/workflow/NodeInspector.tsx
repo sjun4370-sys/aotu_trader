@@ -7,6 +7,7 @@ import { MultiSelect, type CurrencyOption } from '../ui/multi-select'
 import { StatusSelect } from '../ui/status-select'
 import { MOCK_CURRENCIES } from '../../data/currencies'
 import NodeDataViewer from '../node-data-viewer/NodeDataViewer'
+import { getCurrencies, type CurrencyInfo } from '../../services/workflow'
 import styles from './NodeInspector.module.css'
 
 interface NodeInspectorProps {
@@ -520,6 +521,37 @@ function NodeInspectorContent({
   const [selectedCurrencies, setSelectedCurrencies] = useState<string[]>(
     () => (node.config.currencies as string[]) ?? []
   )
+  const [availableCurrencies, setAvailableCurrencies] = useState<CurrencyOption[]>([])
+  const [loadingCurrencies, setLoadingCurrencies] = useState(false)
+
+  // 从后端获取币种列表
+  useEffect(() => {
+    if (node.type !== 'currency') return
+
+    const fetchCurrencies = async () => {
+      setLoadingCurrencies(true)
+      try {
+        const response = await getCurrencies()
+        if (response.success && response.currencies) {
+          const options: CurrencyOption[] = response.currencies.map((c: CurrencyInfo) => ({
+            code: c.inst_id,
+            name: c.base_currency,
+          }))
+          setAvailableCurrencies(options)
+        } else {
+          // API 失败时使用 MOCK 数据
+          setAvailableCurrencies(MOCK_CURRENCIES as CurrencyOption[])
+        }
+      } catch {
+        setAvailableCurrencies(MOCK_CURRENCIES as CurrencyOption[])
+      } finally {
+        setLoadingCurrencies(false)
+      }
+    }
+
+    fetchCurrencies()
+  }, [node.type])
+
   const [selectedTriggerType, setSelectedTriggerType] = useState<string>(
     () => (node.config.triggerType as string) || 'manual'
   )
@@ -1244,6 +1276,52 @@ function NodeInspectorContent({
     }
   }, [node.type, upstreamCurrencies, selectedMarketCurrencies.length])
 
+  // K线节点：从上游获取可用币种
+  const upstreamCandleCurrencies: CurrencyOption[] = useMemo(() => {
+    if (node.type !== 'okx_candles') return []
+    for (const item of inputDataByPort) {
+      if (item.data) {
+        const data = item.data as { currencies?: unknown[]; inst_ids?: string[]; inst_id?: string }
+        // 支持 currencies 数组格式（来自币种选择器）
+        if (Array.isArray(data.currencies)) {
+          if (typeof data.currencies[0] === 'string') {
+            return (data.currencies as string[]).map((code: string) => ({ code, name: code.replace('-USDT', '') }))
+          } else {
+            return (data.currencies as { inst_id?: string; code?: string; base_currency?: string }[]).map((c) => ({
+              code: c.inst_id || c.code || '',
+              name: c.base_currency || c.code?.replace('-USDT', '') || '',
+            }))
+          }
+        }
+        // 支持 inst_ids 数组格式
+        if (Array.isArray(data.inst_ids)) {
+          return (data.inst_ids as string[]).map((code: string) => ({ code, name: code.replace('-USDT', '') }))
+        }
+        // 支持单个 inst_id
+        if (data.inst_id) {
+          return [{ code: data.inst_id, name: data.inst_id.replace('-USDT', '') }]
+        }
+      }
+    }
+    return []
+  }, [node.type, inputDataByPort])
+
+  const [selectedCandleCurrencies, setSelectedCandleCurrencies] = useState<string[]>(() => {
+    const saved = node.config.inst_ids as string[] | undefined
+    if (saved && saved.length > 0) return saved
+    const savedInstId = node.config.inst_id as string | undefined
+    if (savedInstId) return [savedInstId]
+    if (upstreamCandleCurrencies.length > 0) return [upstreamCandleCurrencies[0].code]
+    return []
+  })
+
+  // 当上游币种加载后，如果当前没有选中任何币种，自动选择第一个
+  useEffect(() => {
+    if (node.type === 'okx_candles' && upstreamCandleCurrencies.length > 0 && selectedCandleCurrencies.length === 0) {
+      setSelectedCandleCurrencies([upstreamCandleCurrencies[0].code])
+    }
+  }, [node.type, upstreamCandleCurrencies, selectedCandleCurrencies.length])
+
 
   const handleApply = () => {
     try {
@@ -1272,6 +1350,11 @@ function NodeInspectorContent({
         parsed.indicator = selectedIndicator
         parsed.indicatorParams = indicatorParams
         parsed.dataSourceNodeId = selectedDataSourceNodeId
+      }
+      if (node.type === 'okx_candles') {
+        parsed.inst_ids = selectedCandleCurrencies
+        parsed.bar = selectedInterval
+        parsed.limit = klineCount
       }
       setErrorMessage('')
       setIsSaving(true)
@@ -1346,12 +1429,16 @@ function NodeInspectorContent({
           ) : node.type === 'currency' ? (
             <div className={styles.currencyConfig}>
               <span className={styles.configLabel}>选择币种</span>
-              <MultiSelect
-                options={MOCK_CURRENCIES as CurrencyOption[]}
-                value={selectedCurrencies}
-                onChange={setSelectedCurrencies}
-                placeholder="搜索并选择币种..."
-              />
+              {loadingCurrencies ? (
+                <span className={styles.configHint}>加载中...</span>
+              ) : (
+                <MultiSelect
+                  options={availableCurrencies.length > 0 ? availableCurrencies : MOCK_CURRENCIES as CurrencyOption[]}
+                  value={selectedCurrencies}
+                  onChange={setSelectedCurrencies}
+                  placeholder="搜索并选择币种..."
+                />
+              )}
             </div>
           ) : node.type === 'account' ? (
             <div className={styles.marketConfig}>
@@ -1512,6 +1599,40 @@ function NodeInspectorContent({
                   </div>
                 )
               })()}
+            </div>
+          ) : node.type === 'okx_candles' ? (
+            <div className={styles.marketConfig}>
+              {upstreamCandleCurrencies.length > 0 ? (
+                <div className={styles.configField}>
+                  <span className={styles.configLabel}>选择币种</span>
+                  <MultiSelect
+                    options={upstreamCandleCurrencies}
+                    value={selectedCandleCurrencies}
+                    onChange={setSelectedCandleCurrencies}
+                    placeholder="从上游币种中选择..."
+                  />
+                </div>
+              ) : (
+                <p className={styles.configHint}>暂无可用货币（请先连接币种选择器节点）</p>
+              )}
+              <div className={styles.configRow}>
+                <span className={styles.configLabel}>周期</span>
+                <IntervalSelect
+                  value={selectedInterval}
+                  onChange={setSelectedInterval}
+                />
+              </div>
+              <div className={styles.configField}>
+                <span className={styles.configLabel}>K线数量</span>
+                <input
+                  type="number"
+                  className={styles.configInput}
+                  value={klineCount}
+                  onChange={(e) => setKlineCount(Number(e.target.value))}
+                  min={1}
+                  max={1000}
+                />
+              </div>
             </div>
           ) : (
             <textarea

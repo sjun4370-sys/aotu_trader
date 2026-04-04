@@ -38,12 +38,12 @@ class OKXConnectorManager:
                     cls._instance = super().__new__(cls)
         return cls._instance
 
-    def initialize(self, config: OKXConfig):
+    def initialize(self, config: OKXConfig, proxy: str = None):
         """初始化连接器"""
-        self._market_api = MarketAPI(flag=config.flag)
+        self._market_api = MarketAPI(flag=config.flag, proxy=proxy)
         self._trade_api = TradeAPI(config=config)
         self._account_api = AccountAPI(config=config)
-        logger.info(f"OKX连接器已初始化 (模拟盘: {config.is_demo})")
+        logger.info(f"OKX连接器已初始化 (模拟盘: {config.is_demo}, 代理: {proxy})")
 
     @property
     def market(self) -> MarketAPI:
@@ -84,7 +84,7 @@ async def execute_node(
     if node_type == "okx_ticker":
         return await _execute_okx_ticker(node_id, config, context, timestamp)
     elif node_type == "okx_candles":
-        return await _execute_okx_candles(node_id, config, context, timestamp)
+        return await _execute_okx_candles(node_id, config, inputs, context, timestamp)
     elif node_type == "okx_orderbook":
         return await _execute_okx_orderbook(node_id, config, context, timestamp)
     elif node_type == "okx_account":
@@ -184,70 +184,124 @@ async def _execute_okx_ticker(
 async def _execute_okx_candles(
     node_id: str,
     config: Dict,
+    inputs: Dict[str, NodeOutput],
     context: ExecutionContext,
     timestamp: float
 ) -> NodeOutput:
-    """OKX K线节点 - 真实API调用"""
-    inst_id = config.get("inst_id", "BTC-USDT")
+    """OKX K线节点 - 真实API调用，支持多币种"""
     bar = config.get(
         "bar", "1H"
-    )  # 1m, 3m, 5m, 15m, 30m, 1H, 2H, 4H, 6H, 8H, 12H, 1D, 1W, 1M
+    )  # OKX API 要求大写格式: 1m, 3m, 5m, 15m, 30m, 1H, 2H, 4H, 6H, 8H, 12H, 1D, 1W, 1M
+    # 转换小写为大字（前端传的是 "1h"，OKX 需要 "1H"）
+    bar = bar.upper() if bar else "1H"
     limit = config.get("limit", 100)
 
-    logger.info(f"[OKX API] 获取 {inst_id} K线数据 (周期: {bar}, 条数: {limit})")
+    # 优先从配置获取币种，如果没有则从上游输入获取
+    inst_ids: List[str] = config.get("inst_ids", [])
+
+    if not inst_ids:
+        # 从上游币种选择器获取币种列表
+        for input_node_id, input_output in inputs.items():
+            if hasattr(input_output, 'data') and input_output.data:
+                data = input_output.data
+                # 支持 currencies 数组格式
+                if isinstance(data, dict):
+                    if data.get("currencies"):
+                        currencies_data = data.get("currencies", [])
+                        if isinstance(currencies_data, list) and len(currencies_data) > 0:
+                            # currencies 可能是字符串数组或对象数组
+                            if isinstance(currencies_data[0], str):
+                                inst_ids = currencies_data
+                            else:
+                                inst_ids = [c.get("inst_id") or c.get("code") for c in currencies_data if c.get("inst_id") or c.get("code")]
+                        elif data.get("inst_id"):
+                            inst_ids = [data.get("inst_id")]
+                # 支持直接的 inst_ids 数组
+                elif data.get("inst_ids"):
+                    inst_ids = data.get("inst_ids", [])
+
+    # 如果还是没有，使用默认 BTC
+    if not inst_ids:
+        inst_ids = ["BTC-USDT"]
+
+    logger.info(f"[OKX API] 获取 K线数据 (币种: {inst_ids}, 周期: {bar}, 条数: {limit})")
 
     try:
-        result = okx_manager.market.get_candles(inst_id, bar=bar, limit=limit)
-        success, data = okx_manager.market.parse_response(result)
+        all_candles: Dict[str, List] = {}
+        all_closes: Dict[str, List] = {}
+        errors: Dict[str, str] = {}
 
-        if success and data:
-            # 转换为DataFrame格式
-            candles = []
-            for item in data:
-                candle = {
-                    "timestamp": int(item[0]),
-                    "open": Decimal(item[1]),
-                    "high": Decimal(item[2]),
-                    "low": Decimal(item[3]),
-                    "close": Decimal(item[4]),
-                    "vol": Decimal(item[5]),
-                    "vol_ccy": Decimal(item[6]) if len(item) > 6 else None,
-                }
-                candles.append(candle)
+        for inst_id in inst_ids:
+            try:
+                result = okx_manager.market.get_candles(inst_id, bar=bar, limit=limit)
+                success, data = okx_manager.market.parse_response(result)
 
-            closes = [c["close"] for c in candles]
+                if success and data:
+                    candles = []
+                    for item in data:
+                        candle = {
+                            "timestamp": int(item[0]),
+                            "open": Decimal(item[1]),
+                            "high": Decimal(item[2]),
+                            "low": Decimal(item[3]),
+                            "close": Decimal(item[4]),
+                            "vol": Decimal(item[5]),
+                            "vol_ccy": Decimal(item[6]) if len(item) > 6 else None,
+                        }
+                        candles.append(candle)
 
-            # 保存到上下文
-            context.variables[f"{inst_id}_candles_{bar}"] = candles
-            context.variables[f"{inst_id}_closes"] = closes
-            context.variables["candles"] = candles
+                    closes = [c["close"] for c in candles]
+                    all_candles[inst_id] = candles
+                    all_closes[inst_id] = closes
 
-            logger.info(f"[OKX API] 获取到 {len(candles)} 条K线数据")
-            output = {
-                "inst_id": inst_id,
-                "bar": bar,
-                "candles": candles,
-                "closes": closes,
-                "count": len(candles),
-                "latest_close": candles[0]["close"] if candles else None,
-            }
-            return NodeOutput(
-                success=True,
-                node_id=node_id,
-                node_type="okx_candles",
-                data=output,
-                timestamp=timestamp
-            )
-        else:
-            error_msg = f"API返回错误: {data}"
+                    # 保存到上下文
+                    context.variables[f"{inst_id}_candles_{bar}"] = candles
+                    context.variables[f"{inst_id}_closes"] = closes
+
+                    logger.info(f"[OKX API] {inst_id} 获取到 {len(candles)} 条K线数据")
+                else:
+                    errors[inst_id] = f"API返回错误: {data}"
+                    logger.warning(f"[OKX API] {inst_id} 获取失败: {data}")
+
+            except Exception as e:
+                errors[inst_id] = str(e)
+                logger.error(f"[OKX API] {inst_id} 获取异常: {e}")
+
+        # 汇总结果
+        output = {
+            "inst_ids": inst_ids,
+            "bar": bar,
+            "candles": all_candles,
+            "closes": all_closes,
+            "count": sum(len(c) for c in all_candles.values()),
+            "errors": errors if errors else None,
+        }
+
+        # 保存默认币种数据到上下文
+        if all_candles:
+            first_inst_id = list(all_candles.keys())[0]
+            context.variables["candles"] = all_candles[first_inst_id]
+            context.variables["closes"] = all_closes[first_inst_id]
+            context.variables["inst_id"] = first_inst_id
+            output["latest_close"] = all_candles[first_inst_id][0]["close"] if all_candles[first_inst_id] else None
+
+        if errors and not all_candles:
             return NodeOutput(
                 success=False,
                 node_id=node_id,
                 node_type="okx_candles",
                 data={},
                 timestamp=timestamp,
-                error=error_msg
+                error=f"所有币种获取失败: {errors}"
             )
+
+        return NodeOutput(
+            success=True,
+            node_id=node_id,
+            node_type="okx_candles",
+            data=output,
+            timestamp=timestamp
+        )
 
     except Exception as e:
         logger.error(f"[OKX API] 获取K线失败: {e}")
