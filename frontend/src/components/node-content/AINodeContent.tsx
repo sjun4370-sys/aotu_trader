@@ -4,7 +4,7 @@ import styles from './NodeContent.shared.module.css'
 interface Props { node: WorkflowNode }
 
 export default function AINodeContent({ node }: Props) {
-  const hasConfig = !!node.config.model
+  const hasConfig = !!(node.config.model || node.config.provider)
 
   if (hasConfig) {
     return <div className={styles.container} />

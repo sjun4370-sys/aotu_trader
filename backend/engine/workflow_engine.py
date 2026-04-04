@@ -7,6 +7,7 @@ import asyncio
 import logging
 from typing import Dict, List, Any, Optional, Callable, Set
 from datetime import datetime, timezone
+from decimal import Decimal
 from dataclasses import dataclass
 from enum import Enum
 
@@ -40,12 +41,26 @@ from engine.node_executors.merge_executor import execute_node as execute_merge
 logger = logging.getLogger(__name__)
 
 
+def _serialize_for_json(obj):
+    """递归转换 Decimal 为 float，确保 JSON 序列化兼容"""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {k: _serialize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [_serialize_for_json(item) for item in obj]
+    elif isinstance(obj, set):
+        return [_serialize_for_json(item) for item in obj]
+    return obj
+
+
 class ExecutionStatus(Enum):
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
     STOPPED = "stopped"
+    SKIPPED = "skipped"
 
 
 @dataclass
@@ -133,7 +148,8 @@ class WorkflowEngine:
         db=None,  # NEW
     ) -> List[NodeExecutionResult]:
         """执行工作流"""
-        logger.info(f"[Engine] 开始执行工作流: {workflow_id}")
+        execution_start_time = datetime.now(timezone.utc)
+        logger.info(f"[Engine] 开始执行工作流 {workflow_id} (节点:{len(nodes)} 边:{len(edges)})")
 
         node_map = {node["id"]: node for node in nodes}
         active_nodes = {node["id"] for node in nodes}
@@ -149,8 +165,9 @@ class WorkflowEngine:
             ]
 
         results = []
+        total_nodes = len(execution_order)
 
-        for node_id in execution_order:
+        for idx, node_id in enumerate(execution_order, 1):
             # Skip check: node not in active branch
             if node_id not in active_nodes:
                 results.append(
@@ -189,9 +206,8 @@ class WorkflowEngine:
                     if from_id in context.node_outputs:
                         inputs[from_id] = context.node_outputs[from_id]
 
-            start_time = datetime.now(timezone.utc)
+            logger.info(f"[Engine] [{idx}/{total_nodes}] {node_id} ({node.get('type', 'unknown')})")
             result = await self._execute_node(node, node_id, inputs, context)
-            end_time = datetime.now(timezone.utc)
             results.append(result)
 
             if result.status == ExecutionStatus.COMPLETED:
@@ -223,12 +239,13 @@ class WorkflowEngine:
                         execution_id=context.execution_id,
                         node_id=node_id,
                         node_type=node_type,
-                        start_time=start_time,
-                        end_time=end_time,
-                        duration_ms=(end_time - start_time).total_seconds() * 1000,
+                        start_time=result.start_time,
+                        end_time=result.end_time,
+                        duration_ms=((result.end_time - result.start_time).total_seconds() * 1000) if result.end_time and result.start_time else 0,
                         status="completed",
-                        output_data=result.output if isinstance(result.output, dict) else {"output": str(result.output)},
+                        output_data=_serialize_for_json(result.output) if isinstance(result.output, dict) else {"output": str(result.output)},
                     )
+                    db.add(log_record)
                     db.commit()
 
             elif result.status == ExecutionStatus.SKIPPED:
@@ -240,12 +257,13 @@ class WorkflowEngine:
                         execution_id=context.execution_id,
                         node_id=node_id,
                         node_type=node_map.get(node_id, {}).get("type", "unknown"),
-                        start_time=start_time,
-                        end_time=end_time,
-                        duration_ms=(end_time - start_time).total_seconds() * 1000,
+                        start_time=result.start_time,
+                        end_time=result.end_time,
+                        duration_ms=((result.end_time - result.start_time).total_seconds() * 1000) if result.end_time and result.start_time else 0,
                         status="skipped",
                         output_data={"skipped": True},
                     )
+                    db.add(log_record)
                     db.commit()
 
             elif result.status == ExecutionStatus.FAILED:
@@ -267,17 +285,20 @@ class WorkflowEngine:
                         execution_id=context.execution_id,
                         node_id=node_id,
                         node_type=node_type,
-                        start_time=start_time,
-                        end_time=end_time,
-                        duration_ms=(end_time - start_time).total_seconds() * 1000,
+                        start_time=result.start_time,
+                        end_time=result.end_time,
+                        duration_ms=((result.end_time - result.start_time).total_seconds() * 1000) if result.end_time and result.start_time else 0,
                         status="failed",
                         error_message=result.error or "Unknown error",
                     )
+                    db.add(log_record)
                     db.commit()
                 break
 
-        logger.info(f"[Engine] 工作流 {workflow_id} 执行完成")
+        total_duration_ms = (datetime.now(timezone.utc) - execution_start_time).total_seconds() * 1000
+        logger.info(f"[Engine] 工作流 {workflow_id} 完成 (耗时:{total_duration_ms:.0f}ms, 节点:{len(results)})")
         return results
+
 
     async def _execute_node(
         self, node: Dict, node_id: str, inputs: Dict[str, NodeOutput], context: ExecutionContext
@@ -287,22 +308,13 @@ class WorkflowEngine:
         config = node.get("config", {})
         start_time = datetime.now(timezone.utc)
 
-        logger.info(f"[Engine] === 执行节点: {node_id} (类型: {node_type}) ===")
-        logger.info(f"[Engine] 配置: {config}")
-
-        # 打印输入数据
-        input_keys = list(inputs.keys())
-        logger.info(f"[Engine] 输入来源: {input_keys}")
-        for src_id, src_output in inputs.items():
-            logger.info(f"[Engine]   ├─ 来源节点: {src_id}")
-            if hasattr(src_output, 'data') and src_output.data:
-                logger.info(f"[Engine]   │  └─ data: {src_output.data}")
-            elif hasattr(src_output, 'error') and src_output.error:
-                logger.error(f"[Engine]   │  └─ error: {src_output.error}")
+        # 打印输入
+        input_preview = {k: str(v.data)[:50] if v.data else None for k, v in inputs.items()}
+        logger.info(f"[Engine] 输入: {input_preview}")
 
         executor = self._executors.get(node_type)
         if not executor:
-            logger.error(f"[Engine] ✗ 未知节点类型: {node_type}")
+            logger.error(f"[Engine] 未知节点类型: {node_type}")
             return NodeExecutionResult(
                 node_id=node_id,
                 status=ExecutionStatus.FAILED,
@@ -313,30 +325,34 @@ class WorkflowEngine:
 
         try:
             output = await executor(node_id, node_type, inputs, config, context)
+            end_time = datetime.now(timezone.utc)
+            duration_ms = (end_time - start_time).total_seconds() * 1000
 
-            # 打印执行结果
             if hasattr(output, 'success') and output.success:
-                logger.info(f"[Engine] ✓ 节点 {node_id} 执行成功")
-                logger.info(f"[Engine]   └─ 输出数据: {output.data}")
+                output_data = output.data if hasattr(output, 'data') else None
+                output_preview = str(output_data)[:80] if output_data else None
+                logger.info(f"[Engine] ✓ {node_id} 完成 ({duration_ms:.0f}ms) -> {output_preview}")
             else:
-                logger.error(f"[Engine] ✗ 节点 {node_id} 执行失败: {output.error if hasattr(output, 'error') else 'unknown error'}")
-                logger.error(f"[Engine]   └─ 输出数据: {output.data if hasattr(output, 'data') else output}")
+                error_msg = output.error if hasattr(output, 'error') else 'unknown error'
+                logger.error(f"[Engine] ✗ {node_id} 失败: {error_msg}")
 
             return NodeExecutionResult(
                 node_id=node_id,
                 status=ExecutionStatus.COMPLETED,
                 output=output.data if hasattr(output, 'data') else output,
                 start_time=start_time,
-                end_time=datetime.now(timezone.utc),
+                end_time=end_time,
             )
         except Exception as e:
-            logger.exception(f"[Engine] ✗ 节点 {node_id} 执行异常: {e}")
+            end_time = datetime.now(timezone.utc)
+            duration_ms = (end_time - start_time).total_seconds() * 1000
+            logger.error(f"[Engine] ✗ {node_id} 异常 ({duration_ms:.0f}ms): {e}")
             return NodeExecutionResult(
                 node_id=node_id,
                 status=ExecutionStatus.FAILED,
                 error=str(e),
                 start_time=start_time,
-                end_time=datetime.now(timezone.utc),
+                end_time=end_time,
             )
 
     def _build_dependency_graph(

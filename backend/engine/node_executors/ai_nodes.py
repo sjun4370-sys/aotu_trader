@@ -99,19 +99,25 @@ async def _execute_llm_analysis(
     for src_id, src_output in inputs.items():
         if not src_output or not src_output.data:
             continue
-        node_type = src_output.node_type
+        src_node_type = src_output.node_type
         data = src_output.data
-        if node_type == "okx_ticker":
-            ticker = data
-        elif node_type == "okx_candles":
-            candles = data.get("candles", [])
-        elif node_type == "rsi":
+        if src_node_type == "okx_ticker":
+            # okx_ticker 输出: {"inst_ids": [...], "tickers": {"BTC-USDT": {...}}, ...}
+            tickers = data.get("tickers", {})
+            if tickers:
+                ticker = list(tickers.values())[0]  # 取第一个币种
+        elif src_node_type == "okx_candles":
+            # okx_candles 输出: {"candles": {"BTC-USDT": [...]}, ...}
+            all_candles = data.get("candles", {})
+            if all_candles:
+                candles = list(all_candles.values())[0]  # 取第一个币种的K线
+        elif src_node_type == "rsi":
             rsi = data.get("rsi")
-        elif node_type == "macd":
+        elif src_node_type == "macd":
             macd = data
-        elif node_type == "bollinger":
+        elif src_node_type == "bollinger":
             bollinger = data
-        elif node_type == "ma":
+        elif src_node_type == "ma":
             ma = data
 
     # 兼容context.variables旧写法
@@ -129,8 +135,13 @@ async def _execute_llm_analysis(
 
     logger.info(f"[LLM] 开始市场分析 (Provider: {provider})")
 
-    # 构建提示词
-    prompt = _build_analysis_prompt(market_summary)
+    # 构建提示词（支持用户自定义）
+    custom_prompt = config.get("prompt")
+    if custom_prompt:
+        # 用户自定义提示词，替换变量
+        prompt = custom_prompt.format(**market_summary)
+    else:
+        prompt = _build_analysis_prompt(market_summary)
 
     # 检查API配置
     has_api_key = (provider == "claude" and claude_client) or (provider == "openai" and openai_client)
@@ -404,7 +415,10 @@ async def _execute_signal_generator(
         elif node_type == "macd":
             macd = data
         elif node_type == "okx_ticker":
-            ticker = data
+            # okx_ticker 输出: {"inst_ids": [...], "tickers": {"BTC-USDT": {...}}, ...}
+            tickers = data.get("tickers", {})
+            if tickers:
+                ticker = list(tickers.values())[0]
 
     # 兼容context.variables旧写法
     if not ai_analysis:

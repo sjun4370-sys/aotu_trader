@@ -1306,6 +1306,36 @@ function NodeInspectorContent({
     return []
   }, [node.type, inputDataByPort])
 
+  // 行情节点：从上游获取可用币种
+  const upstreamTickerCurrencies: CurrencyOption[] = useMemo(() => {
+    if (node.type !== 'okx_ticker') return []
+    for (const item of inputDataByPort) {
+      if (item.data) {
+        const data = item.data as { currencies?: unknown[]; inst_ids?: string[]; inst_id?: string }
+        // 支持 currencies 数组格式（来自币种选择器）
+        if (Array.isArray(data.currencies)) {
+          if (typeof data.currencies[0] === 'string') {
+            return (data.currencies as string[]).map((code: string) => ({ code, name: code.replace('-USDT', '') }))
+          } else {
+            return (data.currencies as { inst_id?: string; code?: string; base_currency?: string }[]).map((c) => ({
+              code: c.inst_id || c.code || '',
+              name: c.base_currency || c.code?.replace('-USDT', '') || '',
+            }))
+          }
+        }
+        // 支持 inst_ids 数组格式
+        if (Array.isArray(data.inst_ids)) {
+          return (data.inst_ids as string[]).map((code: string) => ({ code, name: code.replace('-USDT', '') }))
+        }
+        // 支持单个 inst_id
+        if (data.inst_id) {
+          return [{ code: data.inst_id, name: data.inst_id.replace('-USDT', '') }]
+        }
+      }
+    }
+    return []
+  }, [node.type, inputDataByPort])
+
   const [selectedCandleCurrencies, setSelectedCandleCurrencies] = useState<string[]>(() => {
     const saved = node.config.inst_ids as string[] | undefined
     if (saved && saved.length > 0) return saved
@@ -1321,6 +1351,114 @@ function NodeInspectorContent({
       setSelectedCandleCurrencies([upstreamCandleCurrencies[0].code])
     }
   }, [node.type, upstreamCandleCurrencies, selectedCandleCurrencies.length])
+
+  const [selectedTickerCurrencies, setSelectedTickerCurrencies] = useState<string[]>(() => {
+    const saved = node.config.inst_ids as string[] | undefined
+    if (saved && saved.length > 0) return saved
+    const savedInstId = node.config.inst_id as string | undefined
+    if (savedInstId) return [savedInstId]
+    return []
+  })
+
+  // 当上游币种加载后，如果当前没有选中任何币种，自动选择第一个
+  useEffect(() => {
+    if (node.type === 'okx_ticker' && upstreamTickerCurrencies.length > 0 && selectedTickerCurrencies.length === 0) {
+      setSelectedTickerCurrencies([upstreamTickerCurrencies[0].code])
+    }
+  }, [node.type, upstreamTickerCurrencies, selectedTickerCurrencies.length])
+
+  // AI分析节点：配置
+  const [selectedAIProvider, setSelectedAIProvider] = useState<string>(
+    () => (node.config.provider as string) || 'openai'
+  )
+  const [aiModel, setAIModel] = useState<string>(
+    () => (node.config.model as string) || 'gpt-4'
+  )
+  const [aiTemperature, setAITemperature] = useState<number>(
+    () => (node.config.temperature as number) ?? 0.7
+  )
+  const [aiMaxTokens, setAIMaxTokens] = useState<number>(
+    () => (node.config.max_tokens as number) || 2000
+  )
+
+  // AI提示词默认模板
+  const DEFAULT_AI_PROMPT = `你是一位资深的加密货币量化交易专家。请基于以下市场数据，提供详细的交易分析和建议。
+
+## 市场数据
+
+**基础行情**
+- 交易对: {inst_id}
+- 当前价格: {current_price} USDT
+- 24h涨跌: {change_24h}%
+- 24h最高: {high_24h} USDT
+- 24h最低: {low_24h} USDT
+- 24h成交量: {volume_24h} USDT
+- 买卖价差: {bid_ask_spread}%
+
+**技术指标**
+- RSI: {rsi}
+- MACD: {macd[macd]}
+- MACD信号: {macd[signal]}
+- MACD交叉: {macd[crossover]}
+- 短期趋势: {short_term_trend}
+- 波动率: {volatility:.2f}%
+
+## 请提供以下分析
+
+1. **趋势判断**: 当前是上涨/下跌/震荡趋势？判断依据是什么？
+
+2. **技术指标解读**:
+   - RSI指标的含义（超买/超卖/中性）
+   - MACD指标的含义（金叉/死叉/趋势强度）
+   - 其他技术指标的综合判断
+
+3. **关键价位**:
+   - 支撑位（至少2个）
+   - 阻力位（至少2个）
+   - 目标价（短期、中期）
+
+4. **交易建议**:
+   - 操作方向：BUY / SELL / HOLD
+   - 建议仓位：轻仓/半仓/满仓（百分比）
+   - 入场价位区间
+   - 止损价位
+   - 止盈价位
+
+5. **风险评估**:
+   - 风险等级：low / medium / high
+   - 主要风险因素
+   - 建议的风控措施
+
+6. **时间框架**:
+   - 短期预期（1-3天）
+   - 中期预期（1-2周）
+
+7. **置信度评估**:
+   - 给出一个0-100的置信度分数
+   - 说明评分依据
+
+请以结构化的JSON格式返回结果，格式如下：
+{{
+    "sentiment": "bullish/bearish/neutral",
+    "trend": "uptrend/downtrend/sideways",
+    "recommendation": "BUY/SELL/HOLD",
+    "confidence": 75,
+    "reasoning": "详细的分析理由...",
+    "risk_level": "low/medium/high",
+    "key_levels": {{
+        "support": [58000, 56000],
+        "resistance": [62000, 65000],
+        "target": 65000,
+        "stop_loss": 55000
+    }},
+    "position_sizing": "建议仓位百分比",
+    "timeframe": "short_term/medium_term",
+    "detailed_analysis": "详细的市场分析..."
+}}`
+
+  const [aiPrompt, setAIPrompt] = useState<string>(
+    () => (node.config.prompt as string) || DEFAULT_AI_PROMPT
+  )
 
 
   const handleApply = () => {
@@ -1355,6 +1493,16 @@ function NodeInspectorContent({
         parsed.inst_ids = selectedCandleCurrencies
         parsed.bar = selectedInterval
         parsed.limit = klineCount
+      }
+      if (node.type === 'okx_ticker') {
+        parsed.inst_ids = selectedTickerCurrencies
+      }
+      if (node.type === 'llm_analysis') {
+        parsed.provider = selectedAIProvider
+        parsed.model = aiModel
+        parsed.temperature = aiTemperature
+        parsed.max_tokens = aiMaxTokens
+        parsed.prompt = aiPrompt
       }
       setErrorMessage('')
       setIsSaving(true)
@@ -1632,6 +1780,104 @@ function NodeInspectorContent({
                   min={1}
                   max={1000}
                 />
+              </div>
+            </div>
+          ) : node.type === 'okx_ticker' ? (
+            <div className={styles.marketConfig}>
+              {upstreamTickerCurrencies.length > 0 ? (
+                <div className={styles.configField}>
+                  <span className={styles.configLabel}>选择币种</span>
+                  <MultiSelect
+                    options={upstreamTickerCurrencies}
+                    value={selectedTickerCurrencies}
+                    onChange={setSelectedTickerCurrencies}
+                    placeholder="从上游币种中选择..."
+                  />
+                </div>
+              ) : (
+                <p className={styles.configHint}>暂无可用货币（请先连接币种选择器节点）</p>
+              )}
+            </div>
+          ) : node.type === 'llm_analysis' ? (
+            <div className={styles.marketConfig}>
+              <div className={styles.configRow}>
+                <span className={styles.configLabel}>提供商</span>
+                <SimpleSelect
+                  value={selectedAIProvider}
+                  onChange={setSelectedAIProvider}
+                  options={[
+                    { value: 'openai', label: 'OpenAI' },
+                    { value: 'claude', label: 'Claude (Anthropic)' }
+                  ]}
+                />
+              </div>
+              <div className={styles.configField}>
+                <span className={styles.configLabel}>模型</span>
+                <input
+                  type="text"
+                  className={styles.configInput}
+                  value={aiModel}
+                  onChange={(e) => setAIModel(e.target.value)}
+                  placeholder={selectedAIProvider === 'openai' ? 'gpt-4' : 'claude-3-sonnet-20240229'}
+                />
+                <span className={styles.configHint}>
+                  {selectedAIProvider === 'openai' ? '例如: gpt-4, gpt-4o, gpt-3.5-turbo' : '例如: claude-3-opus, claude-3-sonnet'}
+                </span>
+              </div>
+              <div className={styles.configField}>
+                <span className={styles.configLabel}>温度 (Temperature)</span>
+                <input
+                  type="range"
+                  className={styles.configInput}
+                  value={aiTemperature}
+                  onChange={(e) => setAITemperature(Number(e.target.value))}
+                  min={0}
+                  max={1}
+                  step={0.1}
+                />
+                <span className={styles.configHint}>{aiTemperature} - {aiTemperature < 0.3 ? '保守' : aiTemperature > 0.7 ? '创造性' : '平衡'}</span>
+              </div>
+              <div className={styles.configField}>
+                <span className={styles.configLabel}>最大 Token 数</span>
+                <input
+                  type="number"
+                  className={styles.configInput}
+                  value={aiMaxTokens}
+                  onChange={(e) => setAIMaxTokens(Number(e.target.value))}
+                  min={100}
+                  max={4000}
+                  step={100}
+                />
+              </div>
+              <div className={styles.configField}>
+                <div className={styles.configRow} style={{ justifyContent: 'space-between' }}>
+                  <span className={styles.configLabel}>分析提示词</span>
+                  <button
+                    onClick={() => setAIPrompt(DEFAULT_AI_PROMPT)}
+                    type="button"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#38bdf8',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      padding: '2px 8px'
+                    }}
+                  >
+                    重置为默认
+                  </button>
+                </div>
+                <textarea
+                  className={styles.configTextarea}
+                  value={aiPrompt}
+                  onChange={(e) => setAIPrompt(e.target.value)}
+                  rows={15}
+                  spellCheck={false}
+                  style={{ fontFamily: 'monospace', fontSize: '12px' }}
+                />
+                <span className={styles.configHint}>
+                  可用变量: {'{inst_id}'}, {'{current_price}'}, {'{change_24h}'}, {'{rsi}'}, {'{macd}'}, {'{short_term_trend}'}, {'{volatility}'} 等
+                </span>
               </div>
             </div>
           ) : (

@@ -97,8 +97,24 @@ async def _execute_rsi(
         )
 
     candles_output = list(inputs.values())[0]
-    candles = candles_output.data.get("candles", [])
-    inst_id = candles_output.data.get("inst_id", inst_id)
+    logger.info(f"[TA] RSI input type: {type(candles_output.data)}, keys: {candles_output.data.keys() if isinstance(candles_output.data, dict) else 'N/A'}")
+    all_candles = candles_output.data.get("candles", {})
+
+    # 支持多币种格式: {"BTC-USDT": [...], "ETH-USDT": [...]} 或单个列表
+    if isinstance(all_candles, dict):
+        if not all_candles:
+            return NodeOutput(
+                success=False,
+                node_id=node_id,
+                node_type="rsi",
+                data={},
+                timestamp=timestamp,
+                error="K线数据为空"
+            )
+        inst_id = list(all_candles.keys())[0]
+        candles = all_candles[inst_id]
+    else:
+        candles = all_candles
 
     if not candles:
         return NodeOutput(
@@ -107,7 +123,7 @@ async def _execute_rsi(
             node_type="rsi",
             data={},
             timestamp=timestamp,
-            error=f"未找到 {inst_id} 的K线数据，请先添加OKX K线节点"
+            error=f"未找到 {inst_id} 的K线数据"
         )
 
     logger.info(f"[TA] 计算 {inst_id} RSI({period})")
@@ -195,8 +211,23 @@ async def _execute_macd(
         )
 
     candles_output = list(inputs.values())[0]
-    candles = candles_output.data.get("candles", [])
-    inst_id = candles_output.data.get("inst_id", inst_id)
+    all_candles = candles_output.data.get("candles", {})
+
+    # 支持多币种格式: {"BTC-USDT": [...], "ETH-USDT": [...]} 或单个列表
+    if isinstance(all_candles, dict):
+        if not all_candles:
+            return NodeOutput(
+                success=False,
+                node_id=node_id,
+                node_type="macd",
+                data={},
+                timestamp=timestamp,
+                error="K线数据为空"
+            )
+        inst_id = list(all_candles.keys())[0]
+        candles = all_candles[inst_id]
+    else:
+        candles = all_candles
 
     if not candles:
         return NodeOutput(
@@ -303,8 +334,23 @@ async def _execute_bollinger(
         )
 
     candles_output = list(inputs.values())[0]
-    candles = candles_output.data.get("candles", [])
-    inst_id = candles_output.data.get("inst_id", inst_id)
+    all_candles = candles_output.data.get("candles", {})
+
+    # 支持多币种格式: {"BTC-USDT": [...], "ETH-USDT": [...]} 或单个列表
+    if isinstance(all_candles, dict):
+        if not all_candles:
+            return NodeOutput(
+                success=False,
+                node_id=node_id,
+                node_type="bollinger",
+                data={},
+                timestamp=timestamp,
+                error="K线数据为空"
+            )
+        inst_id = list(all_candles.keys())[0]
+        candles = all_candles[inst_id]
+    else:
+        candles = all_candles
 
     if not candles:
         return NodeOutput(
@@ -405,8 +451,23 @@ async def _execute_ma(
         )
 
     candles_output = list(inputs.values())[0]
-    candles = candles_output.data.get("candles", [])
-    inst_id = candles_output.data.get("inst_id", inst_id)
+    all_candles = candles_output.data.get("candles", {})
+
+    # 支持多币种格式: {"BTC-USDT": [...], "ETH-USDT": [...]} 或单个列表
+    if isinstance(all_candles, dict):
+        if not all_candles:
+            return NodeOutput(
+                success=False,
+                node_id=node_id,
+                node_type="ma",
+                data={},
+                timestamp=timestamp,
+                error="K线数据为空"
+            )
+        inst_id = list(all_candles.keys())[0]
+        candles = all_candles[inst_id]
+    else:
+        candles = all_candles
 
     if not candles:
         return NodeOutput(

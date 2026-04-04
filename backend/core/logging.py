@@ -9,19 +9,14 @@ from pathlib import Path
 def setup_logging(
     level: int = logging.INFO,
     log_file: str = None,
-    format_string: str = None,
 ) -> None:
     """
     配置日志
 
     Args:
-        level: 日志级别，默认 INFO
+        level: 日志级别，默认 DEBUG
         log_file: 日志文件路径，默认不写入文件
-        format_string: 日志格式，默认标准格式
     """
-    if format_string is None:
-        format_string = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
-
     handlers = [logging.StreamHandler(sys.stdout)]
 
     if log_file:
@@ -31,13 +26,12 @@ def setup_logging(
 
     logging.basicConfig(
         level=level,
-        format=format_string,
+        format="%(message)s",
         handlers=handlers,
     )
 
-    # 设置第三方库日志级别
     logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("okx").setLevel(logging.INFO)
+    logging.getLogger("okx").setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> logging.Logger:

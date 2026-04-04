@@ -14,6 +14,16 @@ from engine.node_output import NodeOutput
 
 logger = logging.getLogger(__name__)
 
+
+def _safe_decimal(value, default="0"):
+    """安全转换为 Decimal"""
+    if value is None:
+        return Decimal(default)
+    try:
+        return Decimal(str(value))
+    except Exception:
+        return Decimal(default)
+
 # 风控配置
 RISK_CONFIG = {
     "max_loss_pct": Decimal("0.05"),  # 最大亏损比例 5%
@@ -119,34 +129,49 @@ async def _execute_risk_check(
     all_passed = True
 
     # 1. 检查最大亏损比例
-    loss_check = await _check_max_loss(context)
-    checks.append(loss_check)
-    if not loss_check["passed"]:
-        all_passed = False
+    try:
+        loss_check = await _check_max_loss(context)
+        checks.append(loss_check)
+        if not loss_check["passed"]:
+            all_passed = False
+    except Exception as e:
+        checks.append({"passed": False, "check": "max_loss", "reason": f"检查异常: {e}"})
 
     # 2. 检查最大仓位
-    position_check = await _check_max_position(context, signal)
-    checks.append(position_check)
-    if not position_check["passed"]:
-        all_passed = False
+    try:
+        position_check = await _check_max_position(context, signal)
+        checks.append(position_check)
+        if not position_check["passed"]:
+            all_passed = False
+    except Exception as e:
+        checks.append({"passed": False, "check": "max_position", "reason": f"检查异常: {e}"})
 
     # 3. 检查每日交易次数
-    trade_count_check = await _check_daily_trade_count(context)
-    checks.append(trade_count_check)
-    if not trade_count_check["passed"]:
-        all_passed = False
+    try:
+        trade_count_check = await _check_daily_trade_count(context)
+        checks.append(trade_count_check)
+        if not trade_count_check["passed"]:
+            all_passed = False
+    except Exception as e:
+        checks.append({"passed": False, "check": "daily_trade_count", "reason": f"检查异常: {e}"})
 
     # 4. 检查订单价值
-    value_check = await _check_min_order_value(signal)
-    checks.append(value_check)
-    if not value_check["passed"]:
-        all_passed = False
+    try:
+        value_check = await _check_min_order_value(signal)
+        checks.append(value_check)
+        if not value_check["passed"]:
+            all_passed = False
+    except Exception as e:
+        checks.append({"passed": False, "check": "min_order_value", "reason": f"检查异常: {e}"})
 
     # 5. 检查持仓时间（避免过度交易）
-    time_check = await _check_cooldown(context, signal)
-    checks.append(time_check)
-    if not time_check["passed"]:
-        all_passed = False
+    try:
+        time_check = await _check_cooldown(context, signal)
+        checks.append(time_check)
+        if not time_check["passed"]:
+            all_passed = False
+    except Exception as e:
+        checks.append({"passed": False, "check": "cooldown", "reason": f"检查异常: {e}"})
 
     output = {
         "approved": all_passed,
@@ -176,8 +201,8 @@ async def _execute_risk_check(
 async def _check_max_loss(context: ExecutionContext) -> Dict:
     """检查最大亏损比例"""
     # 获取今日已实现盈亏
-    today_pnl = context.variables.get("today_pnl", Decimal("0"))
-    initial_balance = context.variables.get("initial_balance", Decimal("10000"))
+    today_pnl = _safe_decimal(context.variables.get("today_pnl"))
+    initial_balance = _safe_decimal(context.variables.get("initial_balance"), "10000")
 
     if initial_balance <= 0:
         return {"passed": True, "check": "max_loss", "reason": "N/A"}
@@ -201,21 +226,24 @@ async def _check_max_position(context: ExecutionContext, signal: Dict) -> Dict:
     account = context.variables.get("account_balance", {})
     positions = context.variables.get("positions", {})
 
-    total_equity = Decimal(str(account.get("total_equity", 0)))
+    total_equity = _safe_decimal(account.get("total_equity"))
     current_positions_value = Decimal("0")
 
     # 计算当前持仓价值
     for pos in positions.get("positions", []):
         # 兼容不同来源的字段名：okx_data_nodes 用 pos_size，trade_nodes 用 pos
         pos_value = pos.get("pos_size") or pos.get("pos")
-        mark_px = pos.get("mark_px") or 0
-        if pos_value:
-            current_positions_value += abs(Decimal(str(pos_value))) * Decimal(str(mark_px))
+        mark_px = pos.get("mark_px")
+        if pos_value and mark_px is not None:
+            current_positions_value += abs(_safe_decimal(pos_value)) * _safe_decimal(mark_px)
 
     # 计算新订单价值
-    new_order_value = Decimal(str(signal.get("qty", 0))) * Decimal(
-        str(signal.get("price", 0))
-    )
+    qty_val = signal.get("qty")
+    price_val = signal.get("price")
+    if qty_val is not None and price_val is not None:
+        new_order_value = _safe_decimal(qty_val) * _safe_decimal(price_val)
+    else:
+        new_order_value = Decimal("0")
 
     if total_equity <= 0:
         return {"passed": True, "check": "max_position", "reason": "N/A"}
@@ -252,9 +280,31 @@ async def _check_daily_trade_count(context: ExecutionContext) -> Dict:
 
 async def _check_min_order_value(signal: Dict) -> Dict:
     """检查最小订单价值"""
-    qty = Decimal(str(signal.get("qty", 0)))
-    price = Decimal(str(signal.get("price", 0)))
-    order_value = qty * price
+    qty_val = signal.get("qty")
+    price_val = signal.get("price")
+
+    # 处理 None 或无效值
+    if qty_val is None or price_val is None:
+        return {
+            "passed": False,
+            "check": "min_order_value",
+            "current": "N/A",
+            "limit": f"{RISK_CONFIG['min_order_value']:.2f} USDT",
+            "reason": "信号中缺少数量或价格信息",
+        }
+
+    try:
+        qty = _safe_decimal(qty_val)
+        price = _safe_decimal(price_val)
+        order_value = qty * price
+    except Exception:
+        return {
+            "passed": False,
+            "check": "min_order_value",
+            "current": "N/A",
+            "limit": f"{RISK_CONFIG['min_order_value']:.2f} USDT",
+            "reason": "数量或价格格式无效",
+        }
 
     min_value = RISK_CONFIG["min_order_value"]
 
@@ -551,8 +601,8 @@ async def _execute_position_sizing(
         ticker = context.variables.get("ticker", {})
 
     risk_level = signal.get("risk_level", "medium")
-    total_equity = Decimal(str(account.get("total_equity", 0)))
-    current_price = Decimal(str(ticker.get("last", context.variables.get("price", 0))))
+    total_equity = _safe_decimal(account.get("total_equity"))
+    current_price = _safe_decimal(ticker.get("last", context.variables.get("price", 0)))
 
     if total_equity <= 0 or current_price <= 0:
         return NodeOutput(

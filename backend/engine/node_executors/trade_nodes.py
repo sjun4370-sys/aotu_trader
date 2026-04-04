@@ -71,7 +71,7 @@ async def _execute_create_order(
     timestamp: float
 ) -> NodeOutput:
     """
-    创建订单节点 - 真实下单到OKX
+    创建订单节点 - 根据信号实际下单
     """
     # 从inputs迭代收集上游节点数据
     signal_generator = {}
@@ -105,10 +105,36 @@ async def _execute_create_order(
 
     # 获取订单参数
     inst_id = config.get("inst_id", "BTC-USDT")
-    side = config.get("side", "buy")  # buy / sell
+
+    # 优先从信号获取买卖方向
+    signal = signal_generator.get("signal", "") if signal_generator else ""
+    if signal == "BUY":
+        side = "buy"
+    elif signal == "SELL":
+        side = "sell"
+    else:
+        # HOLD 或无信号，不下单
+        logger.info(f"[Trade] 信号为 {signal}，跳过下单")
+        return NodeOutput(
+            success=True,
+            node_id=node_id,
+            node_type="create_order",
+            data={"action": "skip", "signal": signal, "reason": "信号为HOLD，跳过下单"},
+            timestamp=timestamp
+        )
+
     ord_type = config.get("ord_type", "market")  # market / limit
     sz = config.get("sz", "0")  # 数量
     px = config.get("px")  # 价格（限价单）
+
+    # 自动检测现货或合约
+    td_mode = _detect_trade_mode(inst_id)
+    pos_side = _detect_position_side(inst_id, side)
+
+    # 生成客户端订单ID（使用uuid保证唯一性）
+    cl_ord_id = f"wf_{int(time.time() * 1000)}_{context.execution_id[:8]}_{uuid.uuid4().hex[:6]}"
+
+    logger.info(f"[Trade] 信号:{signal} -> 创建订单: {inst_id} {side} {ord_type} {sz}")
 
     # 自动检测现货或合约
     td_mode = _detect_trade_mode(inst_id)
@@ -144,6 +170,8 @@ async def _execute_create_order(
             order_info = data[0]
             output = {
                 "success": True,
+                "action": "order_placed",
+                "signal": signal,
                 "order_id": order_info.get("ordId"),
                 "client_order_id": cl_ord_id,
                 "inst_id": inst_id,

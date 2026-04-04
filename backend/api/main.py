@@ -10,6 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routers import trading, workflow
 from config.system_config import system_config
 from engine.workflow_engine import workflow_engine
+from core.logging import setup_logging
+
+# 初始化日志配置
+setup_logging()
 
 
 @asynccontextmanager

@@ -177,6 +177,10 @@ function getNodeSubtitle(node: WorkflowNode): string | undefined {
       return parts.join(' · ')
     }
     case 'okx_ticker': {
+      const instIds = config.inst_ids as string[] | undefined
+      if (instIds && instIds.length > 0) {
+        return instIds.length === 1 ? instIds[0] : `${instIds.length}个币种`
+      }
       const instId = config.inst_id as string
       return instId || undefined
     }
@@ -184,10 +188,13 @@ function getNodeSubtitle(node: WorkflowNode): string | undefined {
       const instId = config.inst_id as string
       return instId || undefined
     }
-    case 'analysis': {
+    case 'analysis':
+    case 'llm_analysis': {
+      const provider = config.provider as string
       const model = config.model as string
-      if (!model) return undefined
-      return model
+      if (!provider && !model) return undefined
+      const providerLabel = provider === 'openai' ? 'OpenAI' : provider === 'claude' ? 'Claude' : provider
+      return model ? `${providerLabel} · ${model}` : providerLabel
     }
     case 'condition': {
       const expression = config.expression as string

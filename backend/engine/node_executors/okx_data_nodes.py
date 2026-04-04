@@ -82,7 +82,7 @@ async def execute_node(
     timestamp = time.time()
 
     if node_type == "okx_ticker":
-        return await _execute_okx_ticker(node_id, config, context, timestamp)
+        return await _execute_okx_ticker(node_id, config, inputs, context, timestamp)
     elif node_type == "okx_candles":
         return await _execute_okx_candles(node_id, config, inputs, context, timestamp)
     elif node_type == "okx_orderbook":
@@ -105,80 +105,121 @@ async def execute_node(
 async def _execute_okx_ticker(
     node_id: str,
     config: Dict,
+    inputs: Dict[str, NodeOutput],
     context: ExecutionContext,
     timestamp: float
 ) -> NodeOutput:
-    """OKX行情节点 - 真实API调用"""
-    inst_id = config.get("inst_id", "BTC-USDT")
+    """OKX行情节点 - 真实API调用，支持多币种"""
+    # 优先从配置获取币种列表
+    inst_ids: List[str] = config.get("inst_ids", [])
 
-    logger.info(f"[OKX API] 获取 {inst_id} 行情")
+    # 如果没有，从上游获取
+    if not inst_ids:
+        for input_node_id, input_output in inputs.items():
+            if hasattr(input_output, 'data') and input_output.data:
+                data = input_output.data
+                if isinstance(data, dict):
+                    if data.get("currencies"):
+                        currencies_data = data.get("currencies", [])
+                        if isinstance(currencies_data, list) and len(currencies_data) > 0:
+                            if isinstance(currencies_data[0], str):
+                                inst_ids = currencies_data
+                            else:
+                                inst_ids = [c.get("inst_id") or c.get("code") for c in currencies_data if c.get("inst_id") or c.get("code")]
+                        elif data.get("inst_id"):
+                            inst_ids = [data.get("inst_id")]
+                    elif data.get("inst_ids"):
+                        inst_ids = data.get("inst_ids", [])
 
-    try:
-        result = okx_manager.market.get_ticker(inst_id)
-        success, data = okx_manager.market.parse_response(result)
+    # 如果还是没有，使用默认或单个 inst_id
+    if not inst_ids:
+        inst_id = config.get("inst_id", "BTC-USDT")
+        inst_ids = [inst_id]
 
-        if success and data:
-            ticker = data[0]
-            output = {
-                "inst_id": ticker.get("instId"),
-                "last": Decimal(ticker.get("last", 0)),
-                "open_24h": Decimal(ticker.get("open24h", 0)),
-                "high_24h": Decimal(ticker.get("high24h", 0)),
-                "low_24h": Decimal(ticker.get("low24h", 0)),
-                "vol_24h": Decimal(ticker.get("vol24h", 0)),
-                "vol_ccy_24h": Decimal(ticker.get("volCcy24h", 0)),
-                "bid": Decimal(ticker.get("bidPx", 0)) if ticker.get("bidPx") else None,
-                "ask": Decimal(ticker.get("askPx", 0)) if ticker.get("askPx") else None,
-                "bid_sz": Decimal(ticker.get("bidSz", 0))
-                if ticker.get("bidSz")
-                else None,
-                "ask_sz": Decimal(ticker.get("askSz", 0))
-                if ticker.get("askSz")
-                else None,
-                "timestamp": int(ticker.get("ts", 0)),
-                "change_24h": (
-                    (Decimal(ticker.get("last", 0)) - Decimal(ticker.get("open24h", 0)))
-                    / Decimal(ticker.get("open24h", 1))
-                    * 100
-                )
-                if ticker.get("open24h")
-                else Decimal("0"),
-            }
+    logger.info(f"[OKX API] 获取行情数据 (币种: {inst_ids})")
 
-            # 保存到上下文变量
-            context.variables[f"{inst_id}_price"] = output["last"]
-            context.variables[f"{inst_id}_ticker"] = output
-            context.variables["ticker"] = output
+    all_tickers: Dict[str, Dict] = {}
+    errors: Dict[str, str] = {}
 
-            logger.info(f"[OKX API] {inst_id} 当前价格: {output['last']}")
-            return NodeOutput(
-                success=True,
-                node_id=node_id,
-                node_type="okx_ticker",
-                data=output,
-                timestamp=timestamp
-            )
-        else:
-            error_msg = f"API返回错误: {data}"
-            return NodeOutput(
-                success=False,
-                node_id=node_id,
-                node_type="okx_ticker",
-                data={},
-                timestamp=timestamp,
-                error=error_msg
-            )
+    for inst_id in inst_ids:
+        try:
+            result = okx_manager.market.get_ticker(inst_id)
+            success, data = okx_manager.market.parse_response(result)
 
-    except Exception as e:
-        logger.error(f"[OKX API] 获取行情失败: {e}")
+            if success and data:
+                ticker = data[0]
+                output = {
+                    "inst_id": ticker.get("instId"),
+                    "last": Decimal(ticker.get("last", 0)),
+                    "open_24h": Decimal(ticker.get("open24h", 0)),
+                    "high_24h": Decimal(ticker.get("high24h", 0)),
+                    "low_24h": Decimal(ticker.get("low24h", 0)),
+                    "vol_24h": Decimal(ticker.get("vol24h", 0)),
+                    "vol_ccy_24h": Decimal(ticker.get("volCcy24h", 0)),
+                    "bid": Decimal(ticker.get("bidPx", 0)) if ticker.get("bidPx") else None,
+                    "ask": Decimal(ticker.get("askPx", 0)) if ticker.get("askPx") else None,
+                    "bid_sz": Decimal(ticker.get("bidSz", 0))
+                    if ticker.get("bidSz")
+                    else None,
+                    "ask_sz": Decimal(ticker.get("askSz", 0))
+                    if ticker.get("askSz")
+                    else None,
+                    "timestamp": int(ticker.get("ts", 0)),
+                    "change_24h": (
+                        (Decimal(ticker.get("last", 0)) - Decimal(ticker.get("open24h", 0)))
+                        / Decimal(ticker.get("open24h", 1))
+                        * 100
+                    )
+                    if ticker.get("open24h")
+                    else Decimal("0"),
+                }
+
+                all_tickers[inst_id] = output
+
+                # 保存到上下文变量
+                context.variables[f"{inst_id}_price"] = output["last"]
+                context.variables[f"{inst_id}_ticker"] = output
+
+                logger.info(f"[OKX API] {inst_id} 当前价格: {output['last']}")
+            else:
+                errors[inst_id] = f"API返回错误: {data}"
+                logger.warning(f"[OKX API] {inst_id} 获取失败: {data}")
+
+        except Exception as e:
+            errors[inst_id] = str(e)
+            logger.error(f"[OKX API] {inst_id} 获取异常: {e}")
+
+    # 汇总结果
+    result_output = {
+        "inst_ids": inst_ids,
+        "tickers": all_tickers,
+        "count": len(all_tickers),
+        "errors": errors if errors else None,
+    }
+
+    # 保存默认币种数据到上下文
+    if all_tickers:
+        first_inst_id = list(all_tickers.keys())[0]
+        context.variables["ticker"] = all_tickers[first_inst_id]
+        context.variables["inst_id"] = first_inst_id
+
+    if errors and not all_tickers:
         return NodeOutput(
             success=False,
             node_id=node_id,
             node_type="okx_ticker",
             data={},
             timestamp=timestamp,
-            error=str(e)
+            error=f"所有币种获取失败: {errors}"
         )
+
+    return NodeOutput(
+        success=True,
+        node_id=node_id,
+        node_type="okx_ticker",
+        data=result_output,
+        timestamp=timestamp
+    )
 
 
 async def _execute_okx_candles(

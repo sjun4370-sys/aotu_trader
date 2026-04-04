@@ -17,7 +17,7 @@ export default function DataNodeContent({ node }: Props) {
   } else if (type === 'okx_candles') {
     hasConfig = !!(config.bar || (config.inst_ids && (config.inst_ids as string[]).length > 0))
   } else if (type === 'okx_ticker') {
-    hasConfig = !!config.inst_id
+    hasConfig = !!(config.inst_id || (config.inst_ids && (config.inst_ids as string[]).length > 0))
   } else if (type === 'okx_orderbook') {
     hasConfig = !!config.inst_id
   }
