@@ -4,7 +4,7 @@ import styles from './NodeContent.shared.module.css'
 interface Props { node: WorkflowNode }
 
 export default function KlineNodeContent({ node }: Props) {
-  const hasConfig = !!(node.config.timeframe || node.config.symbol)
+  const hasConfig = !!(node.config.bar || node.config.inst_id)
 
   if (hasConfig) {
     return <div className={styles.container} />

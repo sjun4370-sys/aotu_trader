@@ -167,6 +167,23 @@ function getNodeSubtitle(node: WorkflowNode): string | undefined {
       if (!currencies || currencies.length === 0) return undefined
       return currencies.length === 1 ? currencies[0] : `${currencies.length}个币种`
     }
+    case 'okx_candles': {
+      const bar = config.bar as string
+      const limit = config.limit as number
+      if (!bar && !limit) return undefined
+      const parts = []
+      if (bar) parts.push(bar.toUpperCase())
+      if (limit) parts.push(`${limit}条`)
+      return parts.join(' · ')
+    }
+    case 'okx_ticker': {
+      const instId = config.inst_id as string
+      return instId || undefined
+    }
+    case 'okx_orderbook': {
+      const instId = config.inst_id as string
+      return instId || undefined
+    }
     case 'analysis': {
       const model = config.model as string
       if (!model) return undefined

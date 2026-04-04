@@ -14,6 +14,12 @@ export default function DataNodeContent({ node }: Props) {
     hasConfig = !!config.account
   } else if (type === 'indicator') {
     hasConfig = !!config.indicator
+  } else if (type === 'okx_candles') {
+    hasConfig = !!(config.bar || (config.inst_ids && (config.inst_ids as string[]).length > 0))
+  } else if (type === 'okx_ticker') {
+    hasConfig = !!config.inst_id
+  } else if (type === 'okx_orderbook') {
+    hasConfig = !!config.inst_id
   }
 
   // 如果有配置，body 留空（subtitle 已经显示完整信息）
